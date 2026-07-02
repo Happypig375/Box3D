@@ -121,32 +121,32 @@ jobs:
             local framework_dir="$2"
             mkdir -p "$framework_dir"
             cp "$dylib" "$framework_dir/box3d"
-            cat > "$framework_dir/Info.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleDevelopmentRegion</key>
-            <string>en</string>
-            <key>CFBundleExecutable</key>
-            <string>box3d</string>
-            <key>CFBundleIdentifier</key>
-            <string>org.box2d.Box3D</string>
-            <key>CFBundleInfoDictionaryVersion</key>
-            <string>6.0</string>
-            <key>CFBundleName</key>
-            <string>box3d</string>
-            <key>CFBundlePackageType</key>
-            <string>FMWK</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>MinimumOSVersion</key>
-            <string>15.0</string>
-          </dict>
-          </plist>
-          EOF
+            printf '%s\n' \
+              '<?xml version="1.0" encoding="UTF-8"?>' \
+              '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+              '<plist version="1.0">' \
+              '<dict>' \
+              '  <key>CFBundleDevelopmentRegion</key>' \
+              '  <string>en</string>' \
+              '  <key>CFBundleExecutable</key>' \
+              '  <string>box3d</string>' \
+              '  <key>CFBundleIdentifier</key>' \
+              '  <string>org.box2d.Box3D</string>' \
+              '  <key>CFBundleInfoDictionaryVersion</key>' \
+              '  <string>6.0</string>' \
+              '  <key>CFBundleName</key>' \
+              '  <string>box3d</string>' \
+              '  <key>CFBundlePackageType</key>' \
+              '  <string>FMWK</string>' \
+              '  <key>CFBundleShortVersionString</key>' \
+              '  <string>1.0.0</string>' \
+              '  <key>CFBundleVersion</key>' \
+              '  <string>1.0.0</string>' \
+              '  <key>MinimumOSVersion</key>' \
+              '  <string>15.0</string>' \
+              '</dict>' \
+              '</plist>' \
+              > "$framework_dir/Info.plist"
           }
 
           make_framework "build-ios-arm64/bin/Release-iphoneos/libbox3d.dylib" "native/ios/box3d.framework"
