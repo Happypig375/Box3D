@@ -7,14 +7,13 @@
   </PropertyGroup>
 
   <PropertyGroup Label="NuGet">
-    <Authors>Hadrian Tang</Authors>
-    <Company>Hadrian Tang</Company>
-    <Copyright>Copyright (c) 2026 Hadrian Tang</Copyright>
-    <Product>Box3D</Product>
+    <Authors>Erin Catto, Hadrian Tang</Authors>
+    <Copyright>Copyright (c) 2026 Erin Catto, Hadrian Tang</Copyright>
     <PackageId>Box3D</PackageId>
     <PackageTags>box3d;physics;3d;collision;rigid-body</PackageTags>
     <PackageReleaseNotes>Automated release.</PackageReleaseNotes>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>Box2D.png</PackageIcon>
     <PackageProjectUrl>https://github.com/Happypig375/Box3D</PackageProjectUrl>
     <Description>C# bindings for the Box3D 3D physics engine with native binaries for all platforms.</Description>
     <RepositoryUrl>https://github.com/Happypig375/Box3D</RepositoryUrl>
@@ -23,6 +22,9 @@
 
   <!-- Native binaries for NuGet package (download from GitHub Actions) -->
   <ItemGroup>
+    <None Include="Box2D.png"
+          Pack="true"
+          PackagePath="\" />
     <None Include="$(MSBuildThisFileDirectory)native\win-x64\box3d.dll"
           Pack="true"
           PackagePath="runtimes/win-x64/native/" />
@@ -59,14 +61,16 @@
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- Auto-generate native bindings and doc XML when headers change -->
+  <!-- Native libClang for ClangSharpPInvokeGenerator (binding generation) -->
+  <ItemGroup>
+    <PackageReference Include="libclang" Version="21.1.8" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Auto-generate native bindings when headers change -->
   <Target Name="GenerateNativeBindings"
           BeforeTargets="GenerateNativeBindingsDocumentation"
           Inputs="box3d/include/box3d/*.h"
           Outputs="NativeMethods.cs">
-    <!-- Ensure the local tool (ClangSharpPInvokeGenerator) is restored -->
-    <Exec Command="dotnet tool restore"
-          WorkingDirectory="$(MSBuildThisFileDirectory)" />
     <ItemGroup>
       <CHeader Include="box3d/include/box3d/*.h" />
     </ItemGroup>
@@ -74,7 +78,7 @@
     <!-- Generate C# bindings with doc includes -->
     <ItemGroup>
       <_RspCsLines Include="-f;box3d/include/box3d/box3d.h;-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c;--std=c11;-I;box3d/include" />
-      <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;single-file;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
+      <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="--traverse;%(CHeader.Identity)" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
     </ItemGroup>

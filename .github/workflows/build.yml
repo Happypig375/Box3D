@@ -88,13 +88,13 @@ jobs:
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
-          cmake --build build-${{ matrix.platform.name }} --config Release -- CODE_SIGNING_ALLOWED=NO
+          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
 
       - name: Create framework
         run: |
           framework_dir="native/${{ matrix.platform.name }}/box3d.framework"
           mkdir -p "$framework_dir"
-          cp "build-${{ matrix.platform.name }}/bin/Release/libbox3d.dylib" "$framework_dir/box3d"
+          cp "build-${{ matrix.platform.name }}/bin/$BUILD_TYPE/libbox3d.dylib" "$framework_dir/box3d"
           cat > "$framework_dir/Info.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -157,7 +157,7 @@ jobs:
           rm native-*.tar
 
       - name: Pack NuGet package
-        run: dotnet pack -c Release -o ./artifacts
+        run: dotnet pack -c $BUILD_TYPE -o ./artifacts
     
       - name: Upload NuGet package artifact
         uses: actions/upload-artifact@v7
