@@ -170,7 +170,6 @@ jobs:
             echo "LD_LIBRARY_PATH=$libdir" >> $GITHUB_ENV
           fi
 
-
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
     
