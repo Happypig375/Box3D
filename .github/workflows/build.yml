@@ -156,6 +156,17 @@ jobs:
           done
           rm native-*.tar
 
+      - name: Install clang resource directory for libClang
+        run: |
+          # The NuGet's libclang.so lacks its resource directory (compiler built-in
+          # headers like <stdbool.h>, <stdint.h>). Install it from the system package.
+          sudo apt-get update && sudo apt-get install -y libclang-20-dev
+          # Find the installed resource directory for use in the build
+          resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | head -1)
+          if [ -n "$resource_dir" ]; then
+            echo "CLANG_RESOURCE_DIR=$(dirname "$resource_dir")" >> $GITHUB_ENV
+          fi
+
       - name: Make libClang available for P/Invoke generator (workaround)
         run: |
           # ClangSharpPInvokeGenerator needs native libclang.so at runtime.

@@ -73,33 +73,20 @@
       <CHeader Include="box3d/include/box3d/*.h" />
     </ItemGroup>
 
-    <!-- Discover GCC include path on Linux for compiler built-in headers -->
-    <Exec Condition="$([MSBuild]::IsOSPlatform('Linux'))"
-          Command="gcc -print-file-name=include 2>/dev/null"
-          ConsoleToMSBuild="true"
-          StandardOutputImportance="low">
-      <Output TaskParameter="ConsoleOutput" PropertyName="GccIncludePath" />
-    </Exec>
-    <Exec Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$(GccIncludePath)' != '' And '$(GccIncludePath)' != 'include'"
-          Command="test -f '$(GccIncludePath)/stdbool.h' &amp;&amp; echo 'valid' || echo 'invalid'"
-          ConsoleToMSBuild="true"
-          StandardOutputImportance="low">
-      <Output TaskParameter="ConsoleOutput" PropertyName="GccIncludeValid" />
-    </Exec>
-
     <!-- Generate C# bindings with doc includes -->
+    <!--
+      On Linux the NuGet's libclang.so is missing its resource directory (which provides
+      compiler built-in headers like <stdbool.h>, <stdint.h>). The CI workflow installs
+      libclang-20-dev and sets CLANG_RESOURCE_DIR to point at the installed resource dir.
+      When set, pass it as -resource-dir via -a so libClang can find its built-in headers.
+    -->
     <ItemGroup>
       <_RspCsLines Include="-f;box3d/include/box3d/box3d.h;-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c;--std=c11;-I;box3d/include" />
       <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="--traverse;%(CHeader.Identity)" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
-      <!-- On Linux the NuGet's libclang.so is missing its resource directory (compiler
-           built-in headers like <stdbool.h>, <stdint.h>). Add system include paths.
-           Each -a precedes one clang argument, so -idirafter and path need separate -a's. -->
-      <_RspCsLines Condition="$([MSBuild]::IsOSPlatform('Linux'))"
-                   Include="-a;-idirafter;-a;/usr/include" />
-      <_RspCsLines Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$(GccIncludeValid)' == 'valid'"
-                   Include="-a;-idirafter;-a;$(GccIncludePath)" />
+      <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
+                   Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
     </ItemGroup>
     <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
                       Lines="@(_RspCsLines)"
