@@ -81,7 +81,7 @@
       <Output TaskParameter="ConsoleOutput" PropertyName="GccIncludePath" />
     </Exec>
     <Exec Condition="$([MSBuild]::IsOSPlatform('Linux')) And '$(GccIncludePath)' != '' And '$(GccIncludePath)' != 'include'"
-          Command="test -f '$(GccIncludePath)/stdbool.h' && echo 'valid' || echo 'invalid'"
+          Command="test -f '$(GccIncludePath)/stdbool.h' &amp;&amp; echo 'valid' || echo 'invalid'"
           ConsoleToMSBuild="true"
           StandardOutputImportance="low">
       <Output TaskParameter="ConsoleOutput" PropertyName="GccIncludeValid" />
