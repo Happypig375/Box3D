@@ -71,6 +71,9 @@
           BeforeTargets="GenerateNativeBindingsDocumentation"
           Inputs="box3d/include/box3d/*.h"
           Outputs="NativeMethods.cs">
+    <!-- Ensure the local tool (ClangSharpPInvokeGenerator) is restored -->
+    <Exec Command="dotnet tool restore"
+          WorkingDirectory="$(MSBuildThisFileDirectory)" />
     <ItemGroup>
       <CHeader Include="box3d/include/box3d/*.h" />
     </ItemGroup>
