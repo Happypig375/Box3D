@@ -169,13 +169,7 @@ jobs:
             libdir=$(dirname "$libclang_path")
             echo "LD_LIBRARY_PATH=$libdir" >> $GITHUB_ENV
           fi
-          # The NuGet's libclang.so lacks its resource directory (compiler built-in headers
-          # like <stdbool.h>, <stdint.h>). Point libClang at GCC's include path to find them.
-          gcc_include=$(gcc -print-file-name=include 2>/dev/null)
-          if [ -n "$gcc_include" ] && [ "$gcc_include" != "include" ]; then
-            echo "CPATH=$gcc_include" >> $GITHUB_ENV
-            echo "C_INCLUDE_PATH=$gcc_include" >> $GITHUB_ENV
-          fi
+
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
