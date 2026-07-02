@@ -156,31 +156,15 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Install clang resource directory (headers only, not the runtime library)
+      - name: Install libClang v21 (matching ClangSharpPInvokeGenerator 21.1.8.3)
         run: |
-          # The NuGet's libclang.so lacks its resource directory (compiler built-in
-          # headers like <stdbool.h>, <stdint.h>). Install just the headers from the
-          # common package, which does NOT include a conflicting libclang.so.
-          sudo apt-get update && sudo apt-get install -y libclang-common-20-dev
-          # Find the installed resource directory for use in the build
-          resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | head -1)
-          if [ -n "$resource_dir" ]; then
-            echo "CLANG_RESOURCE_DIR=$(dirname "$resource_dir")" >> $GITHUB_ENV
-          fi
-
-      - name: Make libClang available for P/Invoke generator (workaround)
-        run: |
-          # ClangSharpPInvokeGenerator needs native libclang.so at runtime.
-          # The RID package bundles it alongside the executable but it's unused -
-          # see https://github.com/dotnet/ClangSharp/pull/700. Workaround: set LD_LIBRARY_PATH
-          # to the NuGet cache directory containing libclang.so. This step may be removed
-          # in a future release of ClangSharpPInvokeGenerator.
-          dotnet tool restore
-          libclang_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libclang.so' | head -1)
-          if [ -n "$libclang_path" ]; then
-            libdir=$(dirname "$libclang_path")
-            echo "LD_LIBRARY_PATH=$libdir" >> $GITHUB_ENV
-          fi
+          # ClangSharpPInvokeGenerator needs libClang v21.1.x at runtime. The NuGet's
+          # RID package bundles libclang.so but without its resource directory (compiler
+          # built-in headers). Install the matching version from the LLVM apt repo.
+          sudo apt-get update && sudo apt-get install -y lsb-release wget gnupg software-properties-common
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main"
+          sudo apt-get update && sudo apt-get install -y libclang-21-dev
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts

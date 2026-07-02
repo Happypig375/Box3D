@@ -74,19 +74,11 @@
     </ItemGroup>
 
     <!-- Generate C# bindings with doc includes -->
-    <!--
-      On Linux the NuGet's libclang.so is missing its resource directory (which provides
-      compiler built-in headers like <stdbool.h>, <stdint.h>). The CI workflow installs
-      libclang-20-dev and sets CLANG_RESOURCE_DIR to point at the installed resource dir.
-      When set, pass it as -resource-dir via -a so libClang can find its built-in headers.
-    -->
     <ItemGroup>
       <_RspCsLines Include="-f;box3d/include/box3d/box3d.h;-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c;--std=c11;-I;box3d/include" />
       <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="--traverse;%(CHeader.Identity)" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
-      <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
-                   Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
     </ItemGroup>
     <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
                       Lines="@(_RspCsLines)"
