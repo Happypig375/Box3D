@@ -61,11 +61,6 @@
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- Native libClang for ClangSharpPInvokeGenerator (binding generation) -->
-  <ItemGroup>
-    <PackageReference Include="libclang" Version="21.1.8" PrivateAssets="all" />
-  </ItemGroup>
-
   <!-- Auto-generate native bindings when headers change -->
   <Target Name="GenerateNativeBindings"
           BeforeTargets="GenerateNativeBindingsDocumentation"

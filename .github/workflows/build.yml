@@ -156,6 +156,20 @@ jobs:
           done
           rm native-*.tar
 
+      - name: Make libClang available for P/Invoke generator (workaround)
+        run: |
+          # ClangSharpPInvokeGenerator needs native libclang.so at runtime.
+          # The RID package bundles it alongside the executable but it's unused -
+          # see https://github.com/dotnet/ClangSharp/pull/700. Workaround: set LD_LIBRARY_PATH
+          # to the NuGet cache directory containing libclang.so. This step may be removed
+          # in a future release of ClangSharpPInvokeGenerator.
+          dotnet tool restore
+          libclang_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libclang.so' | head -1)
+          if [ -n "$libclang_path" ]; then
+            libdir=$(dirname "$libclang_path")
+            echo "LD_LIBRARY_PATH=$libdir" >> $GITHUB_ENV
+          fi
+
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
     
