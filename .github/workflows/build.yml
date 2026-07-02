@@ -51,7 +51,7 @@ jobs:
           BUILD_TYPE: ${{ env.BUILD_TYPE }}
           ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
           ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
-        run: ./.github/build-native.sh
+        run: build-native.sh
 
       - name: Compress native directory
         run: tar -cvf native-${{ matrix.platform.name }}.tar native/${{ case(!contains(matrix.platform.name, 'android'), matrix.platform.name, format('android/{0}', matrix.platform.abi)) }}
