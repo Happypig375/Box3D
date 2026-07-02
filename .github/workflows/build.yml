@@ -83,11 +83,12 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_FRAMEWORK=ON \
             -DBOX3D_SAMPLES=OFF \
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
-          cmake --build build-ios-arm64 --config Release -- CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Automatic
+          cmake --build build-ios-arm64 --config Release -- CODE_SIGNING_ALLOWED=NO
 
           # Build for simulator (arm64)
           cmake -S box3d -B build-ios-simulator \
@@ -97,6 +98,7 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES="arm64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_FRAMEWORK=ON \
             -DBOX3D_SAMPLES=OFF \
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
@@ -106,13 +108,11 @@ jobs:
           mkdir -p "$output_dir/ios-arm64"
           mkdir -p "$output_dir/ios-arm64-simulator"
 
-          # Copy device binary
-          cp build-ios-arm64/bin/Release-iphoneos/libbox3d.dylib "$output_dir/ios-arm64/" 2>/dev/null || \
-          cp build-ios-arm64/bin/libbox3d.dylib "$output_dir/ios-arm64/"
+          # Copy device framework
+          cp -R "build-ios-arm64/bin/Release-iphoneos/box3d.framework" "$output_dir/ios-arm64/"
 
-          # Copy simulator binary
-          cp build-ios-simulator/bin/Release-iphonesimulator/libbox3d.dylib "$output_dir/ios-arm64-simulator/" 2>/dev/null || \
-          cp build-ios-simulator/bin/libbox3d.dylib "$output_dir/ios-arm64-simulator/"
+          # Copy simulator framework
+          cp -R "build-ios-simulator/bin/Release-iphonesimulator/box3d.framework" "$output_dir/ios-arm64-simulator/"
 
       - name: Compress native directory
         run: tar -cvf native-ios.tar native/ios
