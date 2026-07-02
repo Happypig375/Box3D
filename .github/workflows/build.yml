@@ -94,7 +94,7 @@ jobs:
         run: |
           framework_dir="native/${{ matrix.platform.name }}/box3d.framework"
           mkdir -p "$framework_dir"
-          cp "build-${{ matrix.platform.name }}/bin/Release-${{ matrix.platform.sdk }}/libbox3d.dylib" "$framework_dir/box3d"
+          cp "build-${{ matrix.platform.name }}/bin/Release-${{ matrix.platform.sdk }}/libbox3d*.dylib" "$framework_dir/box3d"
           cat > "$framework_dir/Info.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
