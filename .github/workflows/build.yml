@@ -158,6 +158,7 @@ jobs:
           rm native-*.tar
 
       - name: Pack NuGet package
+        shell: bash
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
     
       - name: Upload NuGet package artifact
