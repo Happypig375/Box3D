@@ -156,11 +156,12 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Install clang resource directory for libClang
+      - name: Install clang resource directory (headers only, not the runtime library)
         run: |
           # The NuGet's libclang.so lacks its resource directory (compiler built-in
-          # headers like <stdbool.h>, <stdint.h>). Install it from the system package.
-          sudo apt-get update && sudo apt-get install -y libclang-20-dev
+          # headers like <stdbool.h>, <stdint.h>). Install just the headers from the
+          # common package, which does NOT include a conflicting libclang.so.
+          sudo apt-get update && sudo apt-get install -y libclang-common-20-dev
           # Find the installed resource directory for use in the build
           resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | head -1)
           if [ -n "$resource_dir" ]; then
