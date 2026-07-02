@@ -50,13 +50,11 @@ mkdir -p "${OUTPUT_DIR}"
 
 # Copy the shared library and import library based on platform
 if [[ "${RUNNER_OS}" == "Windows" ]]; then
-  # Multi-config generators (Visual Studio) put output in config subdirectory
+  # Visual Studio puts output in BUILD_TYPE subdirectory
   if [ -f "build/bin/${BUILD_TYPE}/box3d.dll" ]; then
     cp "build/bin/${BUILD_TYPE}/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
-    cp "build/bin/${BUILD_TYPE}/box3d.lib" "${OUTPUT_DIR}/box3d.lib"
   else
     cp "build/bin/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
-    cp "build/bin/box3d.lib" "${OUTPUT_DIR}/box3d.lib"
   fi
 elif [[ "${RUNNER_OS}" == "Linux" ]]; then
   cp build/bin/libbox3d.so "${OUTPUT_DIR}/libbox3d.so"
