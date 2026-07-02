@@ -1,0 +1,167 @@
+name: Build Native
+
+on: push
+env:
+  BUILD_TYPE: Release
+  ANDROID_NDK_VER: 28.2.13676358
+  ANDROID_PLATFORM_VER: 35
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { name: win-x64,       os: windows-latest,   flags: -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded }
+          - { name: win-arm64,     os: windows-latest,   flags: -A ARM64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded }
+          - { name: linux-x64,     os: ubuntu-latest,     flags: -GNinja }
+          - { name: linux-arm64,   os: ubuntu-22.04-arm, flags: -GNinja }
+          - { name: osx-arm64,     os: macos-latest,     flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 }
+          - { name: android-arm64, os: ubuntu-latest,     flags: -GNinja, abi: arm64-v8a }
+          - { name: android-x64,   os: ubuntu-latest,     flags: -GNinja, abi: x86_64 }
+    name: ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup JDK
+        if: contains(matrix.platform.name, 'android')
+        uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: 21
+      - name: Install Android SDK Manager
+        if: contains(matrix.platform.name, 'android')
+        uses: android-actions/setup-android@v4
+      - name: Install Android SDK
+        if: contains(matrix.platform.name, 'android')
+        run: |
+          sdkmanager --install "platforms;android-$ANDROID_PLATFORM_VER"
+          sdkmanager --install "ndk;$ANDROID_NDK_VER"
+
+      - name: Build
+        shell: bash
+        env:
+          NAME: ${{ matrix.platform.name }}
+          RUNNER_OS: ${{ runner.os }}
+          FLAGS: ${{ matrix.platform.flags }}
+          ANDROID_ABI: ${{ matrix.platform.abi }}
+          BUILD_TYPE: ${{ env.BUILD_TYPE }}
+          ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
+          ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
+        run: ./.github/build-native.sh
+
+      - name: Compress native directory
+        run: tar -cvf native-${{ matrix.platform.name }}.tar native/${{ case(!contains(matrix.platform.name, 'android'), matrix.platform.name, format('android/{0}', matrix.platform.abi)) }}
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-${{ matrix.platform.name }}
+          path: native-${{ matrix.platform.name }}.tar
+          archive: false # don't put in zip, just upload the tar file
+          if-no-files-found: error
+
+  build-ios:
+    name: ios
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Build (iOS)
+        run: |
+          output_dir="native/ios/box3d.xcframework"
+
+          # Build for device (arm64)
+          cmake -S box3d -B build-ios-arm64 \
+            -GXcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBOX3D_SAMPLES=OFF \
+            -DBOX3D_UNIT_TESTS=OFF \
+            -DBOX3D_VALIDATE=OFF
+
+          cmake --build build-ios-arm64 --config Release
+
+          # Build for simulator (arm64)
+          cmake -S box3d -B build-ios-simulator \
+            -GXcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_OSX_ARCHITECTURES="arm64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBOX3D_SAMPLES=OFF \
+            -DBOX3D_UNIT_TESTS=OFF \
+            -DBOX3D_VALIDATE=OFF
+
+          cmake --build build-ios-simulator --config Release
+
+          mkdir -p "$output_dir/ios-arm64"
+          mkdir -p "$output_dir/ios-arm64-simulator"
+
+          # Copy device binary
+          cp build-ios-arm64/bin/Release-iphoneos/libbox3d.dylib "$output_dir/ios-arm64/" 2>/dev/null || \
+          cp build-ios-arm64/bin/libbox3d.dylib "$output_dir/ios-arm64/"
+
+          # Copy simulator binary
+          cp build-ios-simulator/bin/Release-iphonesimulator/libbox3d.dylib "$output_dir/ios-arm64-simulator/" 2>/dev/null || \
+          cp build-ios-simulator/bin/libbox3d.dylib "$output_dir/ios-arm64-simulator/"
+
+      - name: Compress native directory
+        run: tar -cvf native-ios.tar native/ios
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-ios
+          path: native-ios.tar
+          archive: false # don't put in zip, just upload the tar file
+          if-no-files-found: error
+
+  publish-nuget:
+    name: Publish NuGet package
+    runs-on: ubuntu-latest
+    needs: [ build, build-ios ]
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: native-*
+          merge-multiple: true
+
+      - name: Decompress native artifacts
+        run: |
+          for file in native-*.tar
+          do
+            tar -xf "$file"
+          done
+          rm native-*.tar
+
+      - name: Pack NuGet package
+        run: dotnet pack -c Release -o ./artifacts
+    
+      - name: Upload NuGet package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nuget-package
+          path: ./artifacts
+          archive: false # don't put in zip, just upload the nupkg file
+          if-no-files-found: error
+
+      - name: Publish NuGet package
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        if: env.NUGET_API_KEY != ''
+        run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
