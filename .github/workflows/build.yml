@@ -74,8 +74,6 @@ jobs:
 
       - name: Build (iOS)
         run: |
-          output_dir="native/ios/box3d.xcframework"
-
           # Build for device (arm64)
           cmake -S box3d -B build-ios-arm64 \
             -GXcode \
@@ -83,7 +81,6 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_FRAMEWORK=ON \
             -DBOX3D_SAMPLES=OFF \
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
@@ -98,24 +95,66 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES="arm64" \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_FRAMEWORK=ON \
             -DBOX3D_SAMPLES=OFF \
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
           cmake --build build-ios-simulator --config Release
 
-          mkdir -p "$output_dir/ios-arm64"
-          mkdir -p "$output_dir/ios-arm64-simulator"
+          # Build for Mac Catalyst (arm64)
+          cmake -S box3d -B build-ios-maccatalyst \
+            -GXcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST=YES \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+            -DBUILD_SHARED_LIBS=ON \
+            -DBOX3D_SAMPLES=OFF \
+            -DBOX3D_UNIT_TESTS=OFF \
+            -DBOX3D_VALIDATE=OFF
 
-          # Copy device framework
-          cp -R "build-ios-arm64/bin/Release-iphoneos/box3d.framework" "$output_dir/ios-arm64/"
+          cmake --build build-ios-maccatalyst --config Release -- CODE_SIGNING_ALLOWED=NO
 
-          # Copy simulator framework
-          cp -R "build-ios-simulator/bin/Release-iphonesimulator/box3d.framework" "$output_dir/ios-arm64-simulator/"
+          make_framework() {
+            local dylib="$1"
+            local framework_dir="$2"
+            mkdir -p "$framework_dir"
+            cp "$dylib" "$framework_dir/box3d"
+            cat > "$framework_dir/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDevelopmentRegion</key>
+            <string>en</string>
+            <key>CFBundleExecutable</key>
+            <string>box3d</string>
+            <key>CFBundleIdentifier</key>
+            <string>org.box2d.Box3D</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleName</key>
+            <string>box3d</string>
+            <key>CFBundlePackageType</key>
+            <string>FMWK</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>MinimumOSVersion</key>
+            <string>15.0</string>
+          </dict>
+          </plist>
+          EOF
+          }
+
+          make_framework "build-ios-arm64/bin/Release-iphoneos/libbox3d.dylib" "native/ios/box3d.framework"
+          make_framework "build-ios-simulator/bin/Release-iphonesimulator/libbox3d.dylib" "native/iossimulator/box3d.framework"
+          make_framework "build-ios-maccatalyst/bin/Release-iphoneos/libbox3d.dylib" "native/maccatalyst/box3d.framework"
 
       - name: Compress native directory
-        run: tar -cvf native-ios.tar native/ios
+        run: tar -cvf native-ios.tar native/ios native/iossimulator native/maccatalyst
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
