@@ -158,16 +158,8 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Set up NuGet libs + clang headers (no system runtime)
+      - name: Set up clang headers (no system runtime)
         run: |
-          dotnet tool restore
-
-          libclang_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libclang.so' | head -1)
-          nuget_libdir=$(dirname "$libclang_path")
-
-          # libClangSharp.so needs libclang.so.21.1 at runtime
-          ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
-
           # Install only headers (no system libclang runtime)
           sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
           wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
@@ -180,7 +172,6 @@ jobs:
           include_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
           if [ -n "$include_dir" ]; then
             echo "CLANG_RESOURCE_DIR=$(dirname "$include_dir")" >> $GITHUB_ENV
-            echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
           fi
 
       - name: Pack NuGet package
