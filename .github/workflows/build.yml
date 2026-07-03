@@ -156,35 +156,34 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Install libClang v21 (matching ClangSharpPInvokeGenerator 21.1.8.3)
+      - name: Set up NuGet native .so + clang headers
         run: |
-          # ClangSharpPInvokeGenerator 21.1.8.3 needs libClang v21.1.x at runtime.
-          # The NuGet's RID package bundles libclang.so and libClangSharp.so alongside
-          # the executable, but the default resolver can't find them there (dotnet tools
-          # run from the NuGet cache, and SafeDirectories doesn't search the executable's
-          # directory reliably on Linux). See https://github.com/dotnet/ClangSharp/pull/700.
-          #
-          # libclang-21-dev provides the runtime library + resource directory (built-in headers).
-          # LD_LIBRARY_PATH must include both the system clang dir (for libclang.so) and the
-          # NuGet cache dir (for libClangSharp.so).
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg lsb-release
+          dotnet tool restore
+
+          # Find NuGet cache directory with native .so files
+          libclangsharp_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libClangSharp.so' | head -1)
+          if [ -z "$libclangsharp_path" ]; then
+            echo "ERROR: libClangSharp.so not found in NuGet cache" >&2
+            exit 1
+          fi
+          nuget_libdir=$(dirname "$libclangsharp_path")
+          # LD_LIBRARY_PATH: NuGet cache only, no system clang runtime
+          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
+
+          # Add LLVM 21 repo and install ONLY the headers package (no runtime library)
+          sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
           wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
           sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
           echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
           sudo apt-get update
-          sudo apt-get install -y libclang-21-dev
-          # Find the NuGet cache dir containing libClangSharp.so
-          dotnet tool restore
-          libclangsharp_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libClangSharp.so' | head -1)
-          nuget_libdir=""
-          if [ -n "$libclangsharp_path" ]; then
-            nuget_libdir=$(dirname "$libclangsharp_path")
+          # Install headers only - provides the clang resource directory (stdbool.h, etc.)
+          sudo apt-get install -y --no-install-recommends libclang-common-21-dev
+          # Find the resource directory that libclang needs
+          resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | head -1)
+          if [ -n "$resource_dir" ]; then
+            resource_root=$(dirname "$resource_dir")
+            echo "CLANG_RESOURCE_DIR=$resource_root" >> $GITHUB_ENV
           fi
-          # LD_LIBRARY_PATH: system clang (libclang.so + resource dir) + NuGet cache (libClangSharp.so)
-          echo "LD_LIBRARY_PATH=${nuget_libdir}:/usr/lib/llvm-21/lib" >> $GITHUB_ENV
-          # ClangSharp searches libClangSharp but not libClangSharp.so. Create a symlink.
-          sudo ln -sf "${nuget_libdir}/libClangSharp.so" "${nuget_libdir}/libClangSharp"
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
