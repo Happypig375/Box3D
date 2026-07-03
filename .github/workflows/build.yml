@@ -156,7 +156,7 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Set up NuGet + system libClang with headers
+      - name: Use NuGet libs with CLANG_RESOURCE_DIR
         run: |
           dotnet tool restore
 
@@ -168,7 +168,14 @@ jobs:
           fi
           nuget_libdir=$(dirname "$libclangsharp_path")
 
-          # Install system clang v21 (provides libclang.so + matching resource directory)
+          # libClangSharp.so was linked against libclang.so.21.1 (a specific SONAME).
+          # Create symlink so the dependency resolves against the NuGet's libclang.so.
+          ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
+
+          # LD_LIBRARY_PATH: NuGet cache only (all libs together, no symlink path confusion)
+          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
+
+          # Install system headers for the resource directory
           sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
           wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
           sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
@@ -176,16 +183,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libclang-21-dev
 
-          # Debug: check what the system provides
-          echo "=== System LLVM-21 lib dir ==="
-          ls -la /usr/lib/llvm-21/lib/ 2>/dev/null || echo "(llvm-21 lib not found)"
-          (readelf -d /usr/lib/llvm-21/lib/libclang.so 2>/dev/null | grep SONAME) || echo "(readelf not available)"
-
-          # LD_LIBRARY_PATH: system clang first (for libclang.so with headers), NuGet second (libClangSharp.so)
-          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:${nuget_libdir}" >> $GITHUB_ENV
-          # Also create symlink in NuGet cache dir in case libClangSharp.so needs libclang.so.21.1
-          if [ -f "${nuget_libdir}/libclang.so" ]; then
-            ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
+          # Set CLANG_RESOURCE_DIR environment variable - libclang checks this at
+          # initialization before any parsing. Points to the system-installed headers.
+          # This works even though we're using the NuGet's libclang.so for execution.
+          resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
+          if [ -n "$resource_dir" ]; then
+            resource_root=$(dirname "$resource_dir")
+            echo "CLANG_RESOURCE_DIR=$resource_root" >> $GITHUB_ENV
           fi
 
       - name: Pack NuGet package
