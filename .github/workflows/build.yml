@@ -135,7 +135,7 @@ jobs:
 
   publish-nuget:
     name: Publish NuGet package
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: [ build, build-ios ]
     steps:
       - uses: actions/checkout@v7
@@ -149,13 +149,59 @@ jobs:
           merge-multiple: true
 
       - name: Decompress native artifacts
-        shell: bash
         run: |
           for file in native-*.tar
           do
             tar -xf "$file"
           done
           rm native-*.tar
+
+      - name: Create clang resource directory for NuGet's libclang
+        run: |
+          dotnet tool restore
+
+          # Find the NuGet libclang.so location
+          libclang_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libclang.so' | head -1)
+          if [ -z "$libclang_path" ]; then
+            echo "ERROR: libclang.so not found in NuGet cache" >&2
+            exit 1
+          fi
+          nuget_libdir=$(dirname "$libclang_path")
+
+          # libClangSharp.so depends on libclang.so.21.1 (specific SONAME).
+          # Create a symlink so this dependency resolves to the NuGet's libclang.so.
+          ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
+          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
+
+          # The tool reports "clang version 21.1.8". libclang computes its resource
+          # directory relative to libclang.so as: <libclang-dir>/../lib/clang/21.1.8/include/
+          # This path doesn't exist in the NuGet cache. Install system headers and
+          # symlink them to the expected location.
+          expected_resource_dir="${nuget_libdir}/../lib/clang/21.1.8"
+
+          # Install system clang headers
+          sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
+          wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
+          sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
+          sudo apt-get update
+          sudo apt-get install -y libclang-21-dev
+
+          # Find the installed headers and symlink to the expected resource dir
+          system_include=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
+          if [ -n "$system_include" ]; then
+            system_resource_root=$(dirname "$system_include")
+            mkdir -p "$(dirname "$expected_resource_dir")"
+            ln -sfn "$system_resource_root" "$expected_resource_dir"
+            echo "Created resource dir: $expected_resource_dir -> $system_resource_root"
+            echo "(libclang will look for \$dir/include/ which is $system_include)"
+          else
+            echo "WARNING: No system clang headers found"
+          fi
+
+          # Also create symlink for libClangSharp dependency (libclang.so.21.1 SONAME)
+          ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
+          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
 
       - name: Pack NuGet package
         shell: bash
