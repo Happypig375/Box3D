@@ -158,39 +158,29 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Set up native libs and clang resource dir
+      - name: Set up NuGet libs + clang headers (no system runtime)
         run: |
           dotnet tool restore
 
-          # Find the NuGet libclang.so location
           libclang_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libclang.so' | head -1)
-          if [ -z "$libclang_path" ]; then
-            echo "ERROR: libclang.so not found in NuGet cache" >&2
-            exit 1
-          fi
           nuget_libdir=$(dirname "$libclang_path")
 
-          # libClangSharp.so depends on libclang.so.21.1 (specific SONAME).
+          # libClangSharp.so needs libclang.so.21.1 at runtime
           ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
-          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
 
-          # Install libclang-21-dev which provides the resource directory headers
+          # Install only headers (no system libclang runtime)
           sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
           wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
           sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
           echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
           sudo apt-get update
-          sudo apt-get install -y libclang-21-dev
+          sudo apt-get install -y --no-install-recommends libclang-common-21-dev
 
-          # Set CLANG_RESOURCE_DIR env var. libclang checks this at initialization
-          # (before any parsing) and uses it to find built-in headers like <stdbool.h>.
-          system_include=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
-          if [ -n "$system_include" ]; then
-            resource_root=$(dirname "$system_include")
-            echo "CLANG_RESOURCE_DIR=$resource_root" >> $GITHUB_ENV
-            echo "Set CLANG_RESOURCE_DIR=$resource_root"
-          else
-            echo "WARNING: No clang resource directory found"
+          # Set resource dir for -resource-dir flag in csproj
+          include_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
+          if [ -n "$include_dir" ]; then
+            echo "CLANG_RESOURCE_DIR=$(dirname "$include_dir")" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
           fi
 
       - name: Pack NuGet package
