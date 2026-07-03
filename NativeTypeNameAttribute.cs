@@ -2,6 +2,7 @@ using System;
 
 namespace Box3D
 {
+    // -c;generate-helper-types can generate this type, but it's incompatible with -c;single-file (default) right now
     [AttributeUsage(AttributeTargets.All, AllowMultiple = true)]
     internal sealed class NativeTypeNameAttribute : Attribute
     {

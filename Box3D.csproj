@@ -4,6 +4,7 @@
     <TargetFrameworks>net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems> <!-- NativeMethods.cs won't be discovered before first build -->
   </PropertyGroup>
 
   <PropertyGroup Label="NuGet">
@@ -63,26 +64,23 @@
 
   <!-- Auto-generate native bindings when headers change -->
   <Target Name="GenerateNativeBindings"
-          BeforeTargets="GenerateNativeBindingsDocumentation"
-          Inputs="box3d/include/box3d/*.h"
-          Outputs="NativeMethods.cs">
+          BeforeTargets="GenerateNativeBindingsDocumentation">
     <!-- Ensure the local tool (ClangSharpPInvokeGenerator) is restored -->
-    <Exec Command="dotnet tool restore"
-          WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Exec Command="dotnet tool restore" />
     <ItemGroup>
       <CHeader Include="box3d/include/box3d/*.h" />
     </ItemGroup>
 
     <!-- Generate C# bindings with doc includes -->
     <!--
-      On Linux the NuGet's libclang.so lacks its resource directory (built-in headers
+      On Unix systems, the NuGet's libclang.so lacks its resource directory (built-in headers
       like <stdbool.h>, <stdint.h>). The CI workflow installs system clang headers and
       sets CLANG_RESOURCE_DIR to the installed resource root. Pass it as -resource-dir.
     -->
     <ItemGroup>
-      <_RspCsLines Include="-f;box3d/include/box3d/box3d.h;-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c;--std=c11;-I;box3d/include" />
-      <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
-      <_RspCsLines Include="--traverse;%(CHeader.Identity)" />
+      <_RspCsLines Include="-f;%(CHeader.Identity)" />
+      <_RspCsLines Include="-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c" />
+      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
       <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
                    Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
@@ -90,21 +88,19 @@
     <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
                       Lines="@(_RspCsLines)"
                       Overwrite="true" />
-    <Exec Command="dotnet ClangSharpPInvokeGenerator @$(IntermediateOutputPath)generate_cs.rsp"
-          WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <Exec Command="dotnet ClangSharpPInvokeGenerator @$(IntermediateOutputPath)generate_cs.rsp" />
+    <ItemGroup>
+      <Compile Include="NativeMethods.cs" />
+      <Compile Include="NativeTypeNameAttribute.cs" />
+    </ItemGroup>
   </Target>
 
-  <ItemGroup>
-    <Compile Remove="DocGen/DocGen.cs" />
-    <None Include="DocGen/DocGen.cs" /> <!-- for Visual Studio display -->
-  </ItemGroup>
   <Target Name="GenerateNativeBindingsDocumentation"
           BeforeTargets="BeforeBuild"
-          Inputs="box3d/include/box3d/*.h"
+          Inputs="box3d/include/box3d/*.h;NativeMethods.cs"
           Outputs="Box3D.xml">
     <!-- needs to be in its own folder to not let dotnet build this project with infinite recursion -->
-    <Exec Command="dotnet run DocGen.cs"
-          WorkingDirectory="$(MSBuildThisFileDirectory)/DocGen" />
+    <Exec Command="dotnet run DocGen.cs" WorkingDirectory="DocGen" />
   </Target>
 
 </Project>
