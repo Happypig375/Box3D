@@ -174,9 +174,6 @@ jobs:
           echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
           sudo apt-get update
           sudo apt-get install -y libclang-21-dev
-          # libClangSharp.so (from NuGet) depends on libclang.so.21.1 (full versioned SONAME),
-          # but the system package only provides libclang.so.21. Create a symlink.
-          sudo ln -sf /usr/lib/llvm-21/lib/libclang.so.21 /usr/lib/llvm-21/lib/libclang.so.21.1
           # Find the NuGet cache dir containing libClangSharp.so
           dotnet tool restore
           libclangsharp_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libClangSharp.so' | head -1)
@@ -186,6 +183,8 @@ jobs:
           fi
           # LD_LIBRARY_PATH: system clang (libclang.so + resource dir) + NuGet cache (libClangSharp.so)
           echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:${nuget_libdir}" >> $GITHUB_ENV
+          # ClangSharp searches libClangSharp but not libClangSharp.so. Create a symlink.
+          sudo ln -sf "${nuget_libdir}/libClangSharp.so" "${nuget_libdir}/libClangSharp"
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
