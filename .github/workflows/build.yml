@@ -139,6 +139,8 @@ jobs:
     needs: [ build, build-ios ]
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
 
@@ -155,20 +157,6 @@ jobs:
             tar -xf "$file"
           done
           rm native-*.tar
-
-      - name: Diagnose parse failure directly with clang
-        run: |
-          # Install clang-21 so we can run the same parse manually and see actual errors
-          sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
-          wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
-          sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
-          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
-          sudo apt-get update
-          sudo apt-get install -y clang-21
-
-          clang-21 -fsyntax-only -x c --std=c11 \
-            -I box3d/include \
-            box3d/include/box3d/box3d.h 2>&1
 
       - name: Create clang resource directory for NuGet's libclang
         run: |
