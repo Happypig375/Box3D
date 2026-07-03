@@ -158,13 +158,29 @@ jobs:
 
       - name: Install libClang v21 (matching ClangSharpPInvokeGenerator 21.1.8.3)
         run: |
-          # ClangSharpPInvokeGenerator needs libClang v21.1.x at runtime. The NuGet's
-          # RID package bundles libclang.so but without its resource directory (compiler
-          # built-in headers). Install the matching version from the LLVM apt repo.
-          sudo apt-get update && sudo apt-get install -y lsb-release wget gnupg software-properties-common
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main"
-          sudo apt-get update && sudo apt-get install -y libclang-21-dev
+          # ClangSharpPInvokeGenerator 21.1.8.3 needs libClang v21.1.x at runtime.
+          # The NuGet's RID package bundles libclang.so but without its resource directory
+          # (compiler built-in headers like <stdbool.h>, <stdint.h>).
+          #
+          # The custom DllImportResolver in ClangSharp.Interop tries libclang.so.20 (hardcoded
+          # for LLVM 20, a bug - should be 21). It fails, falls through to the default resolver,
+          # which finds libclang.so (symlink) via LD_LIBRARY_PATH.
+          #
+          # libclang-21-dev provides:
+          #   - /usr/lib/llvm-21/lib/libclang.so.21 (the runtime library, v21.1.x)
+          #   - /usr/lib/llvm-21/lib/libclang.so   (symlink, for the default resolver)
+          #   - /usr/lib/llvm-21/lib/clang/21/include/ (resource directory with built-in headers)
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg lsb-release
+          wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
+          sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
+          sudo apt-get update
+          sudo apt-get install -y libclang-21-dev
+          # Set LD_LIBRARY_PATH so the default resolver finds libclang.so (symlink to v21).
+          # The custom resolver tries v20 names and fails, then the default resolver finds
+          # libclang.so via LD_LIBRARY_PATH, loads v21, and the resource directory matches.
+          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib" >> $GITHUB_ENV
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
