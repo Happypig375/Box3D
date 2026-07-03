@@ -182,7 +182,7 @@ jobs:
             nuget_libdir=$(dirname "$libclangsharp_path")
           fi
           # LD_LIBRARY_PATH: system clang (libclang.so + resource dir) + NuGet cache (libClangSharp.so)
-          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:${nuget_libdir}" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=${nuget_libdir}:/usr/lib/llvm-21/lib" >> $GITHUB_ENV
           # ClangSharp searches libClangSharp but not libClangSharp.so. Create a symlink.
           sudo ln -sf "${nuget_libdir}/libClangSharp.so" "${nuget_libdir}/libClangSharp"
 
