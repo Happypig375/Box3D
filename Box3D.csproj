@@ -76,17 +76,16 @@
     <!-- Generate C# bindings with doc includes -->
     <!--
       On Linux the NuGet's libclang.so lacks its resource directory (built-in headers
-      like <stdbool.h>, <stdint.h>). The CI step extracts the headers from a .deb and
-      sets CLANG_RESOURCE_DIR. When set, pass it via -resource-dir so libClang finds
-      its built-in headers.
+      like <stdbool.h>, <stdint.h>). The CI workflow sets CLANG_ADDITIONAL_FLAGS to
+      include -nobuiltininc and GCC's include paths as substitutes.
     -->
     <ItemGroup>
       <_RspCsLines Include="-f;box3d/include/box3d/box3d.h;-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c;--std=c11;-I;box3d/include" />
       <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="--traverse;%(CHeader.Identity)" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
-      <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
-                   Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
+      <_RspCsLines Condition="'$(CLANG_ADDITIONAL_FLAGS)' != ''"
+                   Include="$(CLANG_ADDITIONAL_FLAGS)" />
     </ItemGroup>
     <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
                       Lines="@(_RspCsLines)"

@@ -156,7 +156,7 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Set up NuGet native .so + clang headers
+      - name: Set up NuGet native .so + supply built-in headers via GCC
         run: |
           dotnet tool restore
 
@@ -167,23 +167,24 @@ jobs:
             exit 1
           fi
           nuget_libdir=$(dirname "$libclangsharp_path")
-          # LD_LIBRARY_PATH: NuGet cache only, no system clang runtime
           echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
 
-          # Add LLVM 21 repo and install ONLY the headers package (no runtime library)
-          sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
-          wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
-          sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
-          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
-          sudo apt-get update
-          # Install headers only - provides the clang resource directory (stdbool.h, etc.)
-          sudo apt-get install -y --no-install-recommends libclang-common-21-dev
-          # Find the resource directory that libclang needs
-          resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | head -1)
-          if [ -n "$resource_dir" ]; then
-            resource_root=$(dirname "$resource_dir")
-            echo "CLANG_RESOURCE_DIR=$resource_root" >> $GITHUB_ENV
+          # Build clang additional flags to bypass missing resource directory.
+          # -nobuiltininc skips clang's own resource dir (which doesn't exist).
+          # -isystem adds GCC's include paths as substitutes for built-in headers.
+          FLAGS="-a;-nobuiltininc"
+          FLAGS="$FLAGS;-a;-isystem;-a;/usr/include"
+          FLAGS="$FLAGS;-a;-isystem;-a;/usr/include/x86_64-linux-gnu"
+          GCC_MAJOR=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
+          if [ -n "$GCC_MAJOR" ]; then
+            if [ -d "/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include" ]; then
+              FLAGS="$FLAGS;-a;-isystem;-a;/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include"
+            fi
+            if [ -d "/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include-fixed" ]; then
+              FLAGS="$FLAGS;-a;-isystem;-a;/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include-fixed"
+            fi
           fi
+          echo "CLANG_ADDITIONAL_FLAGS=$FLAGS" >> $GITHUB_ENV
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
