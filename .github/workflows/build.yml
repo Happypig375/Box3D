@@ -156,7 +156,7 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Set up NuGet native .so files with dependency symlinks
+      - name: Set up NuGet + system libClang with headers
         run: |
           dotnet tool restore
 
@@ -168,29 +168,24 @@ jobs:
           fi
           nuget_libdir=$(dirname "$libclangsharp_path")
 
-          # libClangSharp.so was linked against libclang.so.21.1 (a specific SONAME).
-          # The NuGet's libclang.so has that SONAME embedded, but the file is just named
-          # libclang.so. dlopen searches for a file named libclang.so.21.1, so create a
-          # symlink in the same directory so the dependency resolves correctly.
-          ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
-          echo "Created symlink: libclang.so.21.1 -> libclang.so"
-
-          # LD_LIBRARY_PATH: NuGet cache only (has both libclang.so and libClangSharp.so)
-          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
-
-          # The NuGet's libclang.so lacks its resource directory (built-in headers).
-          # Install the system package which provides headers at /usr/lib/llvm-21/lib/clang/21/include/
+          # Install system clang v21 (provides libclang.so + matching resource directory)
           sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
           wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
           sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
           echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
           sudo apt-get update
           sudo apt-get install -y libclang-21-dev
-          # Find the clang resource directory (will be from system package, not NuGet)
-          resource_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
-          if [ -n "$resource_dir" ]; then
-            resource_root=$(dirname "$resource_dir")
-            echo "CLANG_RESOURCE_DIR=$resource_root" >> $GITHUB_ENV
+
+          # Debug: check what the system provides
+          echo "=== System LLVM-21 lib dir ==="
+          ls -la /usr/lib/llvm-21/lib/ 2>/dev/null || echo "(llvm-21 lib not found)"
+          (readelf -d /usr/lib/llvm-21/lib/libclang.so 2>/dev/null | grep SONAME) || echo "(readelf not available)"
+
+          # LD_LIBRARY_PATH: system clang first (for libclang.so with headers), NuGet second (libClangSharp.so)
+          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:${nuget_libdir}" >> $GITHUB_ENV
+          # Also create symlink in NuGet cache dir in case libClangSharp.so needs libclang.so.21.1
+          if [ -f "${nuget_libdir}/libclang.so" ]; then
+            ln -sf "${nuget_libdir}/libclang.so" "${nuget_libdir}/libclang.so.21.1"
           fi
 
       - name: Pack NuGet package

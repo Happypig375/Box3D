@@ -79,8 +79,6 @@
       <_RspCsLines Include="-c;latest-codegen;-c;strip-enum-member-type-name;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="--traverse;%(CHeader.Identity)" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
-      <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
-                   Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
     </ItemGroup>
     <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
                       Lines="@(_RspCsLines)"
