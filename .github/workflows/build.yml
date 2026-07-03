@@ -196,8 +196,15 @@ jobs:
           archive: false # don't put in zip, just upload the nupkg file
           if-no-files-found: error
 
-      - name: Publish NuGet package
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        if: env.NUGET_API_KEY != '' && startsWith(github.ref, 'refs/tags/')
-        run: dotnet nuget push ./artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+      # Get a short-lived NuGet API key
+      - name: NuGet login (OIDC → temp API key)
+        continue-on-error: true
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: Happypig375
+    
+      # Push the package
+      - name: NuGet push
+        continue-on-error: true
+        run: dotnet nuget push artifacts/*.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate

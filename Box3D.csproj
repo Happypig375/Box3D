@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems> <!-- NativeMethods.cs won't be discovered before first build -->
@@ -20,6 +20,26 @@
     <RepositoryUrl>https://github.com/Happypig375/Box3D</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
+
+  <Target Name="DerivePackageVersion" BeforeTargets="BeforeBuild">
+    <!-- Extract the 3-part version from the submodule's CMakeLists.txt -->
+    <Exec Command="powershell -NoLogo -NoProfile -Command &quot;&amp; { (Select-String -Path '$(MSBuildThisFileDirectory)box3d\CMakeLists.txt' -Pattern 'VERSION (\d+\.\d+\.\d+)').Matches.Groups[1].Value }&quot;"
+          ConsoleToMSBuild="true"
+          Condition="$([System.OperatingSystem]::IsWindows())">
+      <Output TaskParameter="ConsoleOutput" PropertyName="Version" />
+    </Exec>
+    <!-- On non-Windows, use grep -->
+    <Exec Command="grep -oP 'VERSION \K\d+\.\d+\.\d+' '$(MSBuildThisFileDirectory)box3d/CMakeLists.txt'"
+          ConsoleToMSBuild="true"
+          Condition="!$([System.OperatingSystem]::IsWindows())">
+      <Output TaskParameter="ConsoleOutput" PropertyName="Version" />
+    </Exec>
+    <PropertyGroup>
+      <!-- Set <Version> to just the submodule version (revision must be <= 65535) -->
+      <!-- NuGet package version also uses date as the 4th part -->
+      <PackageVersion>$(Version).$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</PackageVersion>
+    </PropertyGroup>
+  </Target>
 
   <!-- Native binaries for NuGet package (download from GitHub Actions) -->
   <ItemGroup>
@@ -80,7 +100,7 @@
     <ItemGroup>
       <_RspCsLines Include="-f;%(CHeader.Identity)" />
       <_RspCsLines Include="-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c" />
-      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
+      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
       <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
                    Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
@@ -99,8 +119,7 @@
           BeforeTargets="BeforeBuild"
           Inputs="box3d/include/box3d/*.h;NativeMethods.cs"
           Outputs="Box3D.xml">
-    <!-- needs to be in its own folder to not let dotnet build this project with infinite recursion -->
-    <Exec Command="dotnet run DocGen.cs" WorkingDirectory="DocGen" />
+    <Exec Command="dotnet run DocGen.cs" WorkingDirectory="Scripts" />
   </Target>
 
 </Project>

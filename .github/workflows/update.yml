@@ -1,0 +1,44 @@
+name: Update Submodule
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # Daily at 06:00 UTC
+  workflow_dispatch:        # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Update box3d submodule to latest upstream commit
+        run: git submodule update --remote box3d
+
+      - name: Check if submodule changed
+        id: check
+        run: |
+          if git diff --exit-code box3d; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "commit=$(cd box3d && git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify that project builds after submodule update
+        if: steps.check.outputs.changed == 'true'
+        run: dotnet build
+
+      - name: Commit and push changes
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add box3d
+          git commit -m "Update box3d submodule to erincatto/box3d@${{ steps.check.outputs.commit }}"
+          git push
