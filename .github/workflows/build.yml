@@ -156,7 +156,7 @@ jobs:
           done
           rm native-*.tar
 
-      - name: Set up NuGet native .so + supply built-in headers via GCC
+      - name: Set up NuGet native .so + system libclang with headers
         run: |
           dotnet tool restore
 
@@ -167,24 +167,17 @@ jobs:
             exit 1
           fi
           nuget_libdir=$(dirname "$libclangsharp_path")
-          echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
 
-          # Build clang additional flags to bypass missing resource directory.
-          # -nobuiltininc skips clang's own resource dir (which doesn't exist).
-          # -isystem adds GCC's include paths as substitutes for built-in headers.
-          FLAGS="-a;-nobuiltininc"
-          FLAGS="$FLAGS;-a;-isystem;-a;/usr/include"
-          FLAGS="$FLAGS;-a;-isystem;-a;/usr/include/x86_64-linux-gnu"
-          GCC_MAJOR=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
-          if [ -n "$GCC_MAJOR" ]; then
-            if [ -d "/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include" ]; then
-              FLAGS="$FLAGS;-a;-isystem;-a;/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include"
-            fi
-            if [ -d "/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include-fixed" ]; then
-              FLAGS="$FLAGS;-a;-isystem;-a;/usr/lib/gcc/x86_64-linux-gnu/${GCC_MAJOR}/include-fixed"
-            fi
-          fi
-          echo "CLANG_ADDITIONAL_FLAGS=$FLAGS" >> $GITHUB_ENV
+          # Install system clang v21 (provides libclang.so + resource directory with built-in headers)
+          sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
+          wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
+          sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
+          sudo apt-get update
+          sudo apt-get install -y libclang-21-dev
+
+          # LD_LIBRARY_PATH: system clang first (libclang.so + headers), NuGet cache second (libClangSharp.so)
+          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:${nuget_libdir}" >> $GITHUB_ENV
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
