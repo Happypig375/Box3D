@@ -159,17 +159,14 @@ jobs:
       - name: Install libClang v21 (matching ClangSharpPInvokeGenerator 21.1.8.3)
         run: |
           # ClangSharpPInvokeGenerator 21.1.8.3 needs libClang v21.1.x at runtime.
-          # The NuGet's RID package bundles libclang.so but without its resource directory
-          # (compiler built-in headers like <stdbool.h>, <stdint.h>).
+          # The NuGet's RID package bundles libclang.so and libClangSharp.so alongside
+          # the executable, but the default resolver can't find them there (dotnet tools
+          # run from the NuGet cache, and SafeDirectories doesn't search the executable's
+          # directory reliably on Linux). See https://github.com/dotnet/ClangSharp/pull/700.
           #
-          # The custom DllImportResolver in ClangSharp.Interop tries libclang.so.20 (hardcoded
-          # for LLVM 20, a bug - should be 21). It fails, falls through to the default resolver,
-          # which finds libclang.so (symlink) via LD_LIBRARY_PATH.
-          #
-          # libclang-21-dev provides:
-          #   - /usr/lib/llvm-21/lib/libclang.so.21 (the runtime library, v21.1.x)
-          #   - /usr/lib/llvm-21/lib/libclang.so   (symlink, for the default resolver)
-          #   - /usr/lib/llvm-21/lib/clang/21/include/ (resource directory with built-in headers)
+          # libclang-21-dev provides the runtime library + resource directory (built-in headers).
+          # LD_LIBRARY_PATH must include both the system clang dir (for libclang.so) and the
+          # NuGet cache dir (for libClangSharp.so).
           sudo apt-get update
           sudo apt-get install -y wget gnupg lsb-release
           wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
@@ -177,10 +174,15 @@ jobs:
           echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" | sudo tee /etc/apt/sources.list.d/llvm21.list
           sudo apt-get update
           sudo apt-get install -y libclang-21-dev
-          # Set LD_LIBRARY_PATH so the default resolver finds libclang.so (symlink to v21).
-          # The custom resolver tries v20 names and fails, then the default resolver finds
-          # libclang.so via LD_LIBRARY_PATH, loads v21, and the resource directory matches.
-          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib" >> $GITHUB_ENV
+          # Find the NuGet cache dir containing libClangSharp.so
+          dotnet tool restore
+          libclangsharp_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libClangSharp.so' | head -1)
+          nuget_libdir=""
+          if [ -n "$libclangsharp_path" ]; then
+            nuget_libdir=$(dirname "$libclangsharp_path")
+          fi
+          # LD_LIBRARY_PATH: system clang (libclang.so + resource dir) + NuGet cache (libClangSharp.so)
+          echo "LD_LIBRARY_PATH=/usr/lib/llvm-21/lib:${nuget_libdir}" >> $GITHUB_ENV
 
       - name: Pack NuGet package
         run: dotnet pack -c $BUILD_TYPE -o ./artifacts
