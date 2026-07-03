@@ -192,7 +192,6 @@ jobs:
           else
             echo "WARNING: No clang resource directory found"
           fi
-          fi
 
       - name: Pack NuGet package
         shell: bash
