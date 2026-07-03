@@ -100,7 +100,7 @@
     <ItemGroup>
       <_RspCsLines Include="-f;%(CHeader.Identity)" />
       <_RspCsLines Include="-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c" />
-      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes" />
+      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
       <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
       <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
                    Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
