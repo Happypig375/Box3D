@@ -6,6 +6,9 @@ env:
   ANDROID_NDK_VER: 28.2.13676358
   ANDROID_PLATFORM_VER: 35
 
+permissions: # For GitHub OIDC
+  id-token: write
+  contents: read
 jobs:
   build:
     strategy:
@@ -196,8 +199,8 @@ jobs:
           archive: false # don't put in zip, just upload the nupkg file
           if-no-files-found: error
 
-      # Get a short-lived NuGet API key
-      - name: NuGet login (OIDC → temp API key)
+      # Get a short-lived NuGet API key via GitHub OIDC
+      - name: NuGet login
         continue-on-error: true
         uses: NuGet/login@v1
         id: login
