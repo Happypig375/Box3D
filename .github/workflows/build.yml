@@ -77,7 +77,7 @@ jobs:
         platform:
           - { name: ios-arm64,          flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0,                    output: ios,          sdk: iphoneos }
           - { name: iossimulator-arm64, flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: iossimulator, sdk: iphonesimulator }
-          - { name: maccatalyst-arm64,  flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST=YES -DCMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY=6 -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: maccatalyst,  sdk: iphoneos }
+          - { name: maccatalyst-arm64,  flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST=YES -DCMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY=6 -DCMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS=macosx -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: maccatalyst,  sdk: iphoneos }
     name: Build ${{ matrix.platform.name }}
     runs-on: macos-latest
     steps:
@@ -286,7 +286,7 @@ jobs:
           if xcrun simctl list devices | grep -q "$RUNTIME_ID"; then
             echo "A device with runtime $RUNTIME_ID already exists."
           else
-            DEVICE_TYPE=$(xcrun simctl list devicetypes | grep -i "iPhone" | head -1 | awk '{print $1}' || true)
+            DEVICE_TYPE=$(xcrun simctl list devicetypes | grep -i "iPhone" | head -1 | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' || true)
             if [ -z "$DEVICE_TYPE" ]; then
               echo "No iPhone device type found; creating device with default type."
               xcrun simctl create "Test Device" "$RUNTIME_ID"
