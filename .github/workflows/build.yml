@@ -222,6 +222,43 @@ jobs:
       - name: Install iOS/macOS workload
         if: matrix.platform.mobile == true && (contains(matrix.platform.name, 'ios') || contains(matrix.platform.name, 'maccatalyst'))
         run: dotnet workload install ios
+            # Apple syncs version numbers across iOS, macOS, and Xcode; the .NET iOS
+      # workload version matches: 26.5.10284 → iOS 26.5 → Xcode 26.5.
+      # (https://github.com/dotnet/macios/issues/25818#issuecomment-4799784136)
+      # We derive Xcode version from the installed iOS workload manifest by
+      # scanning all SDK band directories for `microsoft.net.sdk.ios/` and
+      # metadata/workloads/InstalledManifests/, then picking the latest version.
+      # We query the dotnet binary directly because actions/setup-dotnet may set
+      # $DOTNET_ROOT to $HOME/.dotnet while the actual SDK lives elsewhere.
+      - name: Get Xcode version from iOS workload
+        id: ios-version
+        if: matrix.platform.mobile == true && (contains(matrix.platform.name, 'ios') || contains(matrix.platform.name, 'maccatalyst'))
+        run: |
+          echo "::group::Resolve Xcode version from iOS workload"
+          echo "dotnet version: $(dotnet --version)"
+          DOTNET_ROOT_REAL=$(dirname "$(command -v dotnet)")
+          echo "dotnet root: $DOTNET_ROOT_REAL"
+          _all_versions=
+          for _kind in sdk-manifests metadata/workloads/InstalledManifests; do
+            _dir="$DOTNET_ROOT_REAL/$_kind"
+            [ -d "$_dir" ] || { echo "  $_kind: not found"; continue; }
+            echo "  scanning $_dir ..."
+            for _sub in "$_dir"/*/; do
+              _ios="$_sub/microsoft.net.sdk.ios"
+              [ -d "$_ios" ] || continue
+              _versions=$(ls "$_ios/" 2>/dev/null)
+              echo "  found: $_ios -> $_versions"
+              _all_versions="$_all_versions $_versions"
+            done
+          done
+          IOS_VERSION=$(echo "$_all_versions" | tr ' ' '\n' | grep -v '^$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | cut -d. -f1-2)
+          echo "Resolved Xcode version: ${IOS_VERSION:-latest-stable}"
+          echo "xcode-version=${IOS_VERSION:-latest-stable}" >> "$GITHUB_OUTPUT"
+          echo "::endgroup::"
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: matrix.platform.mobile == true && (contains(matrix.platform.name, 'ios') || contains(matrix.platform.name, 'maccatalyst'))
+        with:
+          xcode-version: ${{ steps.ios-version.outputs.xcode-version }}
 
       - name: Download NuGet package
         uses: actions/download-artifact@v8
@@ -239,7 +276,6 @@ jobs:
           target: google_apis
           arch: ${{ contains(matrix.platform.name, 'arm64') && 'arm64-v8a' || 'x86_64' }}
           avd-name: test
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             cd Scripts
             dotnet run -f ${{ matrix.platform.tfm }} Test.cs
