@@ -4,7 +4,7 @@ on: push
 env:
   WINDOWS_ARM_RUNNER: &windows-latest-arm windows-11-arm
   UBUNTU_ARM_RUNNER: &ubuntu-latest-arm ubuntu-26.04-arm
-  MACOS_FOR_DOTNET_IOS: &macos-latest-dotnet-ios macos-26
+  MACOS_FOR_DOTNET_IOS: &macos-latest-dotnet-ios macos-26-arm64
   BUILD_TYPE: Release
   ANDROID_NDK_VER: 28.2.13676358
   ANDROID_PLATFORM_VER: 35
