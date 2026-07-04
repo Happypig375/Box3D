@@ -77,7 +77,7 @@ jobs:
         platform:
           - { name: ios-arm64,          flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0,                    output: ios,          sdk: iphoneos }
           - { name: iossimulator-arm64, flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: iossimulator, sdk: iphonesimulator }
-          - { name: maccatalyst-arm64,  flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_XCODE_ATTRIBUTE_SUPPORTS_MACCATALYST=YES -DCMAKE_XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY=6 -DCMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS=macosx -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: maccatalyst,  sdk: iphoneos }
+          - { name: maccatalyst-arm64,  flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: maccatalyst,  sdk: maccatalyst }
     name: Build ${{ matrix.platform.name }}
     runs-on: macos-latest
     steps:
@@ -94,7 +94,7 @@ jobs:
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
-          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
+          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO ${{ contains(matrix.platform.name, 'maccatalyst') && '-sdk maccatalyst' || '' }}
 
       - name: Create framework
         run: |
@@ -271,16 +271,12 @@ jobs:
         if: matrix.platform.mobile == true && contains(matrix.platform.name, 'ios')
         shell: bash
         run: |
-          XCODE_VERSION="${{ steps.ios-version.outputs.xcode-version }}"
-          if [ "$XCODE_VERSION" = "latest-stable" ]; then
-            RUNTIME_ID=$(xcrun simctl list runtimes | grep -E "iOS [0-9]" | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
-          else
-            RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-$(echo $XCODE_VERSION | tr . -)"
-          fi
+          # Pick the latest available iOS runtime
+          RUNTIME_ID=$(xcrun simctl list runtimes | grep -E "iOS [0-9]" | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
           echo "Target runtime: $RUNTIME_ID"
           if ! xcrun simctl list runtimes | grep -q "$RUNTIME_ID"; then
-            echo "Runtime $RUNTIME_ID not found. Falling back to latest available iOS runtime."
-            RUNTIME_ID=$(xcrun simctl list runtimes | grep -E "iOS [0-9]" | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
+            echo "Runtime $RUNTIME_ID not found? Falling back to any iOS runtime."
+            RUNTIME_ID=$(xcrun simctl list runtimes | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
             echo "Fallback runtime: $RUNTIME_ID"
           fi
           if xcrun simctl list devices | grep -q "$RUNTIME_ID"; then
