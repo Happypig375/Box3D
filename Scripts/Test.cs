@@ -1,6 +1,6 @@
-// Running this locally without a built NuGet package at artifacts directory will fail.
-// However, on CI, we will have this package at that directory.
-#:property RestoreSources=$(MSBuildProjectDirectory)/../artifacts
+// Using nuget.config in the same directory as this file,
+// Box3D resolves ONLY from the local artifacts directory (error if missing).
+// All other packages resolve from nuget.org as usual.
 #:package Box3D@*
 #:property AllowUnsafeBlocks=true
 #:property TargetFrameworks=net10.0;net10.0-ios;net10.0-android;net10.0-maccatalyst
