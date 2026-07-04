@@ -5,6 +5,7 @@
 #:property AllowUnsafeBlocks=true
 #:property ApplicationId=org.box2d.Box3D // required by ios
 #:property TargetFrameworks=net10.0;net10.0-ios;net10.0-android;net10.0-maccatalyst
+#:property SupportedOSPlatformVersion=26.0
 
 using System;
 using Box3D;
