@@ -4,6 +4,7 @@ on: push
 env:
   WINDOWS_ARM_RUNNER: &windows-latest-arm windows-11-arm
   UBUNTU_ARM_RUNNER: &ubuntu-latest-arm ubuntu-26.04-arm
+  MACOS_FOR_DOTNET_IOS: &macos-latest-dotnet-ios macos-26
   BUILD_TYPE: Release
   ANDROID_NDK_VER: 28.2.13676358
   ANDROID_PLATFORM_VER: 35
@@ -191,9 +192,9 @@ jobs:
           # Mobile platforms — run with mobile workloads
           - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android,    mobile: true }
           - { name: android-x64,     os: ubuntu-latest,    tfm: net10.0-android,    mobile: true }
-          - { name: ios-arm64,       os: macos-latest,     tfm: net10.0-ios,        mobile: true }
-          - { name: iossimulator-arm64, os: macos-latest,  tfm: net10.0-ios,        mobile: true }
-          - { name: maccatalyst-arm64,  os: macos-latest,  tfm: net10.0-maccatalyst, mobile: true }
+          - { name: ios-arm64,       os: *macos-latest-dotnet-ios,     tfm: net10.0-ios,        mobile: true }
+          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net10.0-ios,        mobile: true }
+          - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net10.0-maccatalyst, mobile: true }
     steps:
       - uses: actions/checkout@v7
 
@@ -283,9 +284,8 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: |
-            cd Scripts
-            dotnet run -f ${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} Test.cs
+          script: >- # This script is put after a /usr/bin/sh -c without quotes, so we add them
+            "cd Scripts; dotnet run -f ${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} Test.cs"
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
