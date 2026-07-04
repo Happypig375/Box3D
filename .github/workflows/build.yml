@@ -94,7 +94,7 @@ jobs:
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
-          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO ${{ contains(matrix.platform.name, 'maccatalyst') && '-sdk maccatalyst' || '' }}
+          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO ${{ contains(matrix.platform.name, 'maccatalyst') && 'SUPPORTS_MACCATALYST=YES TARGETED_DEVICE_FAMILY=6' || '' }}
 
       - name: Create framework
         run: |
