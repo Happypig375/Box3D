@@ -82,13 +82,25 @@
           CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Stage all headers to obj/ (never modify submodule), preprocessing math_functions.h -->
+  <Target Name="PreprocessHeaders"
+          BeforeTargets="GenerateNativeBindings"
+          Inputs="box3d/include/box3d/*.h"
+          Outputs="$(IntermediateOutputPath)headers/*.h">
+    <Exec Command="dotnet run StageHeaders.cs -- &quot;$(MSBuildProjectDirectory)\box3d\include\box3d&quot; &quot;$(MSBuildProjectDirectory)\$(IntermediateOutputPath)headers&quot;"
+          WorkingDirectory="Scripts" />
+  </Target>
+
   <!-- Auto-generate native bindings when headers change -->
   <Target Name="GenerateNativeBindings"
-          BeforeTargets="GenerateNativeBindingsDocumentation">
+          BeforeTargets="PostProcessNativeMethods"
+          DependsOnTargets="PreprocessHeaders">
     <!-- Ensure the local tool (ClangSharpPInvokeGenerator) is restored -->
     <Exec Command="dotnet tool restore" />
     <ItemGroup>
-      <CHeader Include="box3d/include/box3d/*.h" />
+      <!-- All headers come from the staged copy in obj/; include resolution
+           works naturally since they're all in the same directory. -->
+      <CHeader Include="$(IntermediateOutputPath)headers/*.h" />
     </ItemGroup>
 
     <!-- Generate C# bindings with doc includes -->
@@ -100,8 +112,7 @@
     <ItemGroup>
       <_RspCsLines Include="-f;%(CHeader.Identity)" />
       <_RspCsLines Include="-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c" />
-      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes;-c;exclude-funcs-with-body" />
-      <_RspCsLines Include="-e;b3IsValidFloat;-e;b3DynamicTree_Validate" />
+      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes" />
       <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
                    Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
     </ItemGroup>
@@ -114,6 +125,16 @@
       <Compile Include="NativeTypeNameAttribute.cs" />
     </ItemGroup>
   </Target>
+
+  <!-- Post-process NativeMethods.cs to remove duplicate struct/field definitions -->
+  <Target Name="PostProcessNativeMethods"
+          BeforeTargets="GenerateNativeBindingsDocumentation"
+          DependsOnTargets="GenerateNativeBindings">
+    <Exec Command="dotnet run PostProcessNativeMethods.cs -- &quot;$(MSBuildProjectDirectory)\NativeMethods.cs&quot;"
+          WorkingDirectory="Scripts" />
+  </Target>
+
+  <!-- No RestoreHeaders needed: we never modify the submodule -->
 
   <Target Name="GenerateNativeBindingsDocumentation"
           BeforeTargets="BeforeBuild"
