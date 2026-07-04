@@ -222,7 +222,7 @@ jobs:
       - name: Install iOS/macOS workload
         if: matrix.platform.mobile == true && (contains(matrix.platform.name, 'ios') || contains(matrix.platform.name, 'maccatalyst'))
         run: dotnet workload install ios
-            # Apple syncs version numbers across iOS, macOS, and Xcode; the .NET iOS
+      # Apple syncs version numbers across iOS, macOS, and Xcode; the .NET iOS
       # workload version matches: 26.5.10284 → iOS 26.5 → Xcode 26.5.
       # (https://github.com/dotnet/macios/issues/25818#issuecomment-4799784136)
       # We derive Xcode version from the installed iOS workload manifest by
@@ -236,7 +236,11 @@ jobs:
         run: |
           echo "::group::Resolve Xcode version from iOS workload"
           echo "dotnet version: $(dotnet --version)"
-          DOTNET_ROOT_REAL=$(dirname "$(command -v dotnet)")
+          DOTNET_ROOT_REAL=$(command -v dotnet)
+          while [ -L "$DOTNET_ROOT_REAL" ]; do
+            DOTNET_ROOT_REAL=$(readlink "$DOTNET_ROOT_REAL") # Resolve symlinks by repeatedly calling readlink
+          done
+          DOTNET_ROOT_REAL=$(dirname "$DOTNET_ROOT_REAL")
           echo "dotnet root: $DOTNET_ROOT_REAL"
           _all_versions=
           for _kind in sdk-manifests metadata/workloads/InstalledManifests; do
@@ -272,13 +276,16 @@ jobs:
         if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VER }}
+          api-level: 35 # must at least be 35. see https://github.com/ReactiveCircus/android-emulator-runner/issues/458
+          arch: x86_64 # cannot use arm arch here. see the same issue above
           target: google_apis
-          arch: ${{ contains(matrix.platform.name, 'arm64') && 'arm64-v8a' || 'x86_64' }}
-          avd-name: test
+          profile: pixel_5
+          force-avd-creation: false
+          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
           script: |
             cd Scripts
-            dotnet run -f ${{ matrix.platform.tfm }} Test.cs
+            dotnet run -f ${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} Test.cs
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
