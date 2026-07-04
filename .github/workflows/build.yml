@@ -173,6 +173,11 @@ jobs:
           archive: false # don't put in zip, just upload the nupkg file
           if-no-files-found: error
 
+      - name: Validate that the NuGet package works
+        run: |
+          cd Scripts
+          dotnet run Test.cs
+
       # Get a short-lived NuGet API key via GitHub OIDC
       - name: NuGet login
         continue-on-error: true
