@@ -24,7 +24,7 @@ jobs:
           - { name: osx-arm64,     os: macos-latest,     flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 }
           - { name: android-arm64, os: ubuntu-latest,     flags: -GNinja, abi: arm64-v8a }
           - { name: android-x64,   os: ubuntu-latest,     flags: -GNinja, abi: x86_64 }
-    name: ${{ matrix.platform.name }}
+    name: Build ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
     steps:
       - uses: actions/checkout@v7
@@ -226,7 +226,7 @@ jobs:
       - name: Download NuGet package
         uses: actions/download-artifact@v8
         with:
-          pattern: *.nupkg
+          pattern: '*.nupkg'
           merge-multiple: true
           path: ./artifacts
 
@@ -256,7 +256,7 @@ jobs:
       - name: Download NuGet package
         uses: actions/download-artifact@v8
         with:
-          pattern: *.nupkg
+          pattern: '*.nupkg'
           merge-multiple: true
           path: ./artifacts
       # Get a short-lived NuGet API key via GitHub OIDC
