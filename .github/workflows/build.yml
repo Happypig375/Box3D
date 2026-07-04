@@ -133,7 +133,6 @@ jobs:
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
         with:
-          name: native-${{ matrix.platform.name }}
           path: native-${{ matrix.platform.name }}.tar
           archive: false # don't put in zip, just upload the tar file
           if-no-files-found: error
@@ -149,7 +148,7 @@ jobs:
       - name: Download native artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: native-*
+          pattern: native-*.tar
           merge-multiple: true
 
       - name: Decompress native artifacts
@@ -227,7 +226,8 @@ jobs:
       - name: Download NuGet package
         uses: actions/download-artifact@v8
         with:
-          name: nuget-package
+          pattern: *.nupkg
+          merge-multiple: true
           path: ./artifacts
 
       # Start Android emulator (for android-arm64 / android-x64)
@@ -256,7 +256,8 @@ jobs:
       - name: Download NuGet package
         uses: actions/download-artifact@v8
         with:
-          name: nuget-package
+          pattern: *.nupkg
+          merge-multiple: true
           path: ./artifacts
       # Get a short-lived NuGet API key via GitHub OIDC
       - name: NuGet login
