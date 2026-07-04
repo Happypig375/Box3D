@@ -2,6 +2,8 @@ name: Build Native
 
 on: push
 env:
+  WINDOWS_ARM_RUNNER: &windows-latest-arm windows-11-arm
+  UBUNTU_ARM_RUNNER: &ubuntu-latest-arm ubuntu-26.04-arm
   BUILD_TYPE: Release
   ANDROID_NDK_VER: 28.2.13676358
   ANDROID_PLATFORM_VER: 35
@@ -18,7 +20,7 @@ jobs:
           - { name: win-x64,       os: windows-latest,   flags: -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded }
           - { name: win-arm64,     os: windows-latest,   flags: -A ARM64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded }
           - { name: linux-x64,     os: ubuntu-latest,     flags: -GNinja }
-          - { name: linux-arm64,   os: ubuntu-22.04-arm, flags: -GNinja }
+          - { name: linux-arm64,   os: *ubuntu-latest-arm, flags: -GNinja }
           - { name: osx-arm64,     os: macos-latest,     flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 }
           - { name: android-arm64, os: ubuntu-latest,     flags: -GNinja, abi: arm64-v8a }
           - { name: android-x64,   os: ubuntu-latest,     flags: -GNinja, abi: x86_64 }
@@ -136,8 +138,8 @@ jobs:
           archive: false # don't put in zip, just upload the tar file
           if-no-files-found: error
 
-  publish-nuget:
-    name: Publish NuGet package
+  pack-nuget:
+    name: Pack NuGet package
     runs-on: ubuntu-latest
     needs: [ build, build-ios ]
     steps:
@@ -173,11 +175,89 @@ jobs:
           archive: false # don't put in zip, just upload the nupkg file
           if-no-files-found: error
 
+  validate:
+    name: Validate NuGet package on ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    needs: pack-nuget
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # Host platforms — run as net10.0 console app
+          - { name: win-x64,         os: windows-latest,   tfm: net10.0 }
+          - { name: win-arm64,       os: *windows-latest-arm,   tfm: net10.0 }
+          - { name: linux-x64,       os: ubuntu-latest,    tfm: net10.0 }
+          - { name: linux-arm64,     os: *ubuntu-latest-arm, tfm: net10.0 }
+          - { name: osx-arm64,       os: macos-latest,     tfm: net10.0 }
+          # Mobile platforms — run with mobile workloads
+          - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android,    mobile: true }
+          - { name: android-x64,     os: ubuntu-latest,    tfm: net10.0-android,    mobile: true }
+          - { name: ios-arm64,       os: macos-latest,     tfm: net10.0-ios,        mobile: true }
+          - { name: iossimulator-arm64, os: macos-latest,  tfm: net10.0-ios,        mobile: true }
+          - { name: maccatalyst-arm64,  os: macos-latest,  tfm: net10.0-maccatalyst, mobile: true }
+    steps:
+      - uses: actions/checkout@v7
+
+      # Android SDK (only needed for Android validation)
+      - name: Setup JDK
+        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
+        uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: 21
+      - name: Install Android SDK Manager
+        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
+        uses: android-actions/setup-android@v4
+      - name: Install Android SDK
+        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
+        run: |
+          sdkmanager --install "platforms;android-$ANDROID_PLATFORM_VER"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+
+      # Mobile workloads
+      - name: Install Android workload
+        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
+        run: dotnet workload install android
+      - name: Install iOS/macOS workload
+        if: matrix.platform.mobile == true && (contains(matrix.platform.name, 'ios') || contains(matrix.platform.name, 'maccatalyst'))
+        run: dotnet workload install ios
+
+      - name: Download NuGet package
+        uses: actions/download-artifact@v8
+        with:
+          name: nuget-package
+          path: ./artifacts
+
+      # Start Android emulator (for android-arm64 / android-x64)
+      - name: Start Android emulator
+        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.ANDROID_PLATFORM_VER }}
+          target: google_apis
+          arch: ${{ contains(matrix.platform.name, 'arm64') && 'arm64-v8a' || 'x86_64' }}
+          avd-name: test
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+
       - name: Validate that the NuGet package works
+        shell: bash
         run: |
           cd Scripts
-          dotnet run Test.cs
+          dotnet run -f ${{ matrix.platform.tfm }} Test.cs
 
+  nuget-push:
+    name: Push to NuGet
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download NuGet package
+        uses: actions/download-artifact@v8
+        with:
+          name: nuget-package
+          path: ./artifacts
       # Get a short-lived NuGet API key via GitHub OIDC
       - name: NuGet login
         continue-on-error: true
@@ -185,7 +265,6 @@ jobs:
         id: login
         with:
           user: Happypig375
-    
       # Push the package
       - name: NuGet push
         continue-on-error: true

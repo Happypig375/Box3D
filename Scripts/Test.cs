@@ -3,6 +3,7 @@
 #:property RestoreSources=$(MSBuildProjectDirectory)/../artifacts
 #:package Box3D@*
 #:property AllowUnsafeBlocks=true
+#:property TargetFrameworks=net10.0;net10.0-ios;net10.0-android;net10.0-maccatalyst
 
 using System;
 using Box3D;
