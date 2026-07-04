@@ -9,6 +9,12 @@
 using System;
 using Box3D;
 using static Box3D.Box3D;
+#if ANDROID
+using Android.App;
+using Android.Content;
+using Android.OS;
+using Android.Runtime;
+#endif
 
 // https://github.com/erincatto/box3d/blob/1bec63c9ee9b8a5bb54900f201c872585ee23260/test/test_world.c#L16-L101
 
@@ -109,3 +115,18 @@ static class Program
 		return 0;
 	}
 }
+
+#if ANDROID
+[Activity(Label = "Box3D Test", MainLauncher = true)]
+public class MainActivity : Activity
+{
+	protected override void OnCreate(Bundle? savedInstanceState)
+	{
+		base.OnCreate(savedInstanceState);
+		int result = Program.Main();
+		if (result != 0)
+			Java.Lang.JavaSystem.Exit(result);
+		Finish();
+	}
+}
+#endif
