@@ -1,0 +1,35 @@
+name: Setup .NET and Clang
+description: Set up .NET and Clang (.so resolution and headers) for ClangSharp P/Invoke generation on Linux
+
+runs:
+  using: composite
+  steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+
+    - name: Set up Clang (.so resolution and headers)
+      shell: bash
+      run: |
+        # Set up .so resolution (work around https://github.com/dotnet/ClangSharp/pull/700)
+        dotnet tool restore
+        libclang_path=$(find ~/.nuget/packages/clangsharppinvokegenerator.linux-x64 -name 'libclang.so' | head -1)
+        nuget_libdir=$(dirname "$libclang_path")
+        echo "LD_LIBRARY_PATH=$nuget_libdir" >> $GITHUB_ENV
+
+        # Extract the ClangSharpPInvokeGenerator major version from dotnet-tools.json
+        clang_tool_version=$(jq -r '.tools.clangsharppinvokegenerator.version' dotnet-tools.json | cut -d'.' -f1)
+        echo "Detected ClangSharp version: $clang_tool_version"
+
+        # Install clang headers
+        sudo apt-get update && sudo apt-get install -y wget gnupg lsb-release
+        wget -qO llvm.key https://apt.llvm.org/llvm-snapshot.gpg.key
+        sudo gpg --dearmor -o /etc/apt/keyrings/llvm.gpg llvm.key
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-${clang_tool_version} main" | sudo tee /etc/apt/sources.list.d/llvm${clang_tool_version}.list
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libclang-common-${clang_tool_version}-dev
+
+        # Use headers via CLANG_RESOURCE_DIR environment variable
+        include_dir=$(find /usr/lib/llvm-*/lib/clang -name 'include' -type d 2>/dev/null | sort -V | tail -1)
+        if [ -n "$include_dir" ]; then
+          echo "CLANG_RESOURCE_DIR=$(dirname "$include_dir")" >> $GITHUB_ENV
+        fi

@@ -30,6 +30,10 @@ jobs:
             echo "commit=$(cd box3d && git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Set up .NET and Clang
+        if: steps.check.outputs.changed == 'true'
+        uses: ./.github/actions/setup-dotnet-clang
+
       - name: Verify that project builds after submodule update
         if: steps.check.outputs.changed == 'true'
         run: dotnet build

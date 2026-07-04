@@ -12,7 +12,6 @@
     <Copyright>Copyright (c) 2026 Erin Catto, Hadrian Tang</Copyright>
     <PackageId>Box3D</PackageId>
     <PackageTags>box3d;physics;3d;collision;rigid-body</PackageTags>
-    <PackageReleaseNotes>Automated release.</PackageReleaseNotes>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>Box2D.png</PackageIcon>
     <PackageProjectUrl>https://github.com/Happypig375/Box3D</PackageProjectUrl>
@@ -21,7 +20,7 @@
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
-  <Target Name="DerivePackageVersion" BeforeTargets="BeforeBuild">
+  <Target Name="DerivePackageVersionAndReleaseNotes" BeforeTargets="BeforeBuild">
     <!-- Extract the 3-part version from the submodule's CMakeLists.txt -->
     <Exec Command="powershell -NoLogo -NoProfile -Command &quot;&amp; { (Select-String -Path '$(MSBuildThisFileDirectory)box3d\CMakeLists.txt' -Pattern 'VERSION (\d+\.\d+\.\d+)').Matches.Groups[1].Value }&quot;"
           ConsoleToMSBuild="true"
@@ -39,6 +38,12 @@
       <!-- NuGet package version also uses date as the 4th part -->
       <PackageVersion>$(Version).$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</PackageVersion>
     </PropertyGroup>
+
+    <!-- Derive PackageReleaseNotes from the last git commit message -->
+    <Exec Command="git log -1 --format=%s"
+          ConsoleToMSBuild="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="PackageReleaseNotes" />
+    </Exec>
   </Target>
 
   <!-- Native binaries for NuGet package (download from GitHub Actions) -->
@@ -87,7 +92,7 @@
           BeforeTargets="GenerateNativeBindings"
           Inputs="box3d/include/box3d/*.h"
           Outputs="$(IntermediateOutputPath)headers/*.h">
-    <Exec Command="dotnet run StageHeaders.cs -- &quot;$(MSBuildProjectDirectory)\box3d\include\box3d&quot; &quot;$(MSBuildProjectDirectory)\$(IntermediateOutputPath)headers&quot;"
+    <Exec Command="dotnet run StageHeaders.cs -- &quot;$(MSBuildProjectDirectory)/box3d/include/box3d&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)headers&quot;"
           WorkingDirectory="Scripts" />
   </Target>
 
@@ -130,7 +135,7 @@
   <Target Name="PostProcessNativeMethods"
           BeforeTargets="GenerateNativeBindingsDocumentation"
           DependsOnTargets="GenerateNativeBindings">
-    <Exec Command="dotnet run PostProcessNativeMethods.cs -- &quot;$(MSBuildProjectDirectory)\NativeMethods.cs&quot;"
+    <Exec Command="dotnet run PostProcessNativeMethods.cs -- &quot;$(MSBuildProjectDirectory)/NativeMethods.cs&quot;"
           WorkingDirectory="Scripts" />
   </Target>
 
