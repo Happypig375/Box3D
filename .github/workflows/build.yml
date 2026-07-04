@@ -230,8 +230,8 @@ jobs:
           merge-multiple: true
           path: ./artifacts
 
-      # Start Android emulator (for android-arm64 / android-x64)
-      - name: Start Android emulator
+      # For Android: start emulator and run validation inside its script parameter
+      - name: Validate on Android emulator
         if: matrix.platform.mobile == true && contains(matrix.platform.name, 'android')
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -240,8 +240,13 @@ jobs:
           arch: ${{ contains(matrix.platform.name, 'arm64') && 'arm64-v8a' || 'x86_64' }}
           avd-name: test
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            cd Scripts
+            dotnet run -f ${{ matrix.platform.tfm }} Test.cs
 
+      # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
+        if: matrix.platform.mobile != true || !contains(matrix.platform.name, 'android')
         shell: bash
         run: |
           cd Scripts
