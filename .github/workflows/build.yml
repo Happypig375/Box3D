@@ -87,35 +87,30 @@ jobs:
 
       - name: Build
         run: |
-          cmake -S box3d -B build-${{ matrix.platform.name }} \
-            ${{ matrix.platform.flags }} \
-            -DBUILD_SHARED_LIBS=ON \
-            -DBOX3D_SAMPLES=OFF \
-            -DBOX3D_UNIT_TESTS=OFF \
-            -DBOX3D_VALIDATE=OFF
-
           if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            # Mac Catalyst: use Unix Makefiles with an explicit target triple
-            # (arm64-apple-ios15.0-macabi). The Xcode generator produces iOS
-            # binaries that can't be overridden at build time, so we avoid it.
-            # CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY skips linker tests
-            # that would fail with a non-macOS sysroot.
+            # Use same Xcode generator as other iOS builds, then build with
+            # xcodebuild and force Mac Catalyst via -destination flag.
             cmake -S box3d -B build-${{ matrix.platform.name }} \
-              -G "Unix Makefiles" \
+              -GXcode \
               -DCMAKE_SYSTEM_NAME=iOS \
               -DCMAKE_OSX_ARCHITECTURES=arm64 \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-              -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
-              -DCMAKE_C_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DCMAKE_CXX_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
               -DBUILD_SHARED_LIBS=ON \
               -DBOX3D_SAMPLES=OFF \
               -DBOX3D_UNIT_TESTS=OFF \
               -DBOX3D_VALIDATE=OFF
-            cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE
+            xcodebuild -project build-${{ matrix.platform.name }}/box3d.xcodeproj \
+              -target box3d \
+              -configuration $BUILD_TYPE \
+              -destination "platform=macOS,variant=Mac Catalyst,arch=arm64" \
+              CODE_SIGNING_ALLOWED=NO
           else
+            cmake -S box3d -B build-${{ matrix.platform.name }} \
+              ${{ matrix.platform.flags }} \
+              -DBUILD_SHARED_LIBS=ON \
+              -DBOX3D_SAMPLES=OFF \
+              -DBOX3D_UNIT_TESTS=OFF \
+              -DBOX3D_VALIDATE=OFF
             cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
           fi
 
@@ -357,6 +352,10 @@ jobs:
           path: ./artifacts
 
       # For Android: start emulator and run validation inside its script parameter
+      - name: Enable KVM
+        if: contains(matrix.platform.name, 'android')
+        run: |
+          sudo chown $USER /dev/kvm || echo "KVM not accessible"
       - name: Validate on Android emulator
         if: contains(matrix.platform.name, 'android')
         uses: reactivecircus/android-emulator-runner@v2
