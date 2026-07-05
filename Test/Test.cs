@@ -24,19 +24,13 @@ static class Program
 {
 	public static unsafe int Main()
 	{
-        Console.WriteLine("Starting test...");
-
 		// Construct a world object, which will hold and simulate the rigid bodies.
-		// Note: Manually initializing to work around Mono runtime bug with delegate* fields in P/Invoke
-		b3WorldDef worldDef = default;
+		b3WorldDef worldDef = b3DefaultWorldDef();
 		worldDef.gravity = new b3Vec3 { x = 0.0f, y = -10.0f, z = 0.0f };
-		worldDef.enableSleep = true;
-		worldDef.enableContinuous = true;
-		worldDef.internalValue = 1152023;
 
 		b3WorldId worldId = b3CreateWorld( &worldDef );
 		if ( !b3World_IsValid( worldId ) )
-			return 1;
+			return 3001;
 
 		// Define the ground body.
 		b3BodyDef groundBodyDef = b3DefaultBodyDef();
@@ -47,7 +41,7 @@ static class Program
 		// The body is also added to the world.
 		b3BodyId groundId = b3CreateBody( worldId, &groundBodyDef );
 		if ( !b3Body_IsValid( groundId ) )
-			return 1;
+			return 3002;
 
 		// Define the ground box shape. The extents are the half-widths of the box.
 		b3BoxHull groundBox = b3MakeBoxHull( 50.0f, 10.0f, 50.0f );
@@ -106,11 +100,11 @@ static class Program
 		b3DestroyWorld( worldId );
 
 		if ( Math.Abs( position.y - 1.00f ) > 0.01f )
-			return 1;
+			return 3003;
 		if ( Math.Abs( rotation.v.x ) > 0.01f )
-			return 1;
+			return 3004;
 		if ( Math.Abs( rotation.v.z ) > 0.01f )
-			return 1;
+			return 3005;
 
         Console.WriteLine("Test succeeded.");
 		return 0;
