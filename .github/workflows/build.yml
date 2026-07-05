@@ -102,7 +102,7 @@ jobs:
               -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
               -DCMAKE_C_FLAGS="-target arm64-apple-ios15.0-macabi" \
               -DCMAKE_CXX_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi -Wl,-install_name,@rpath/box3d.framework/box3d" \
               -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
               -DBUILD_SHARED_LIBS=ON \
               -DBOX3D_SAMPLES=OFF \
@@ -382,11 +382,14 @@ jobs:
               echo "=== Device plist ==="
               plutil -p ~/Library/Developer/CoreSimulator/Devices/$DEVICE_UDID/device.plist 2>/dev/null || true
               echo "=== Runtime plist ==="
-              RUNTIME_PATH=$(xcrun simctl list runtimes 2>/dev/null | grep "$RUNTIME_ID" | grep -o '/.*' | head -1)
-              echo "Runtime path: $RUNTIME_PATH"
-              if [ -n "$RUNTIME_PATH" ]; then
-                plutil -p "$RUNTIME_PATH" 2>/dev/null || true
-              fi
+              echo "Runtime ID: $RUNTIME_ID"
+              # Find the runtime's SystemVersion.plist
+              find /Applications -path "*/CoreSimulator/Profiles/Runtimes/*.simruntime" -type d -maxdepth 8 2>/dev/null | while read rt; do
+                if plutil -p "$rt/Contents/Resources/SystemVersion.plist" 2>/dev/null | grep -q "$RUNTIME_ID"; then
+                  echo "Found runtime at: $rt"
+                  plutil -p "$rt/Contents/Resources/SystemVersion.plist" 2>/dev/null || true
+                fi
+              done
               xcrun simctl boot "$DEVICE_UDID" 2>&1 || true
               xcrun simctl bootstatus "$DEVICE_UDID" -t 120 2>&1 || true
             fi
@@ -413,6 +416,22 @@ jobs:
             if [ -n "$APP_DIR" ]; then
               EXEC=$(find "$APP_DIR" -type f -perm +111 -maxdepth 3 | head -1)
               if [ -n "$EXEC" ]; then
+                echo "=== Linked libraries ==="
+                otool -L "$EXEC" 2>&1 || true
+                echo "=== App bundle contents ==="
+                find "$APP_DIR" -type f 2>/dev/null | head -20 || true
+                echo "=== box3d.framework in NuGet ==="
+                find ~/.nuget/packages/box3d -name "box3d.framework" -type d 2>/dev/null | head -3 || echo "Not found in ~/.nuget/packages"
+                echo "=== nupkg maccatalyst contents ==="
+                NUPKG=$(ls ../artifacts/Box3D.*.nupkg 2>/dev/null | head -1)
+                if [ -n "$NUPKG" ]; then
+                  unzip -l "$NUPKG" 2>/dev/null | grep "maccatalyst" | head -10
+                fi
+                echo "=== box3d dylib install name ==="
+                NUGET_FW=$(find ~/.nuget/packages/box3d -name "box3d.framework" -type d 2>/dev/null | head -1)
+                if [ -n "$NUGET_FW" ]; then
+                  otool -L "$NUGET_FW/box3d" 2>&1 || true
+                fi
                 "$EXEC"
               else
                 echo "No executable found in $APP_DIR" >&2

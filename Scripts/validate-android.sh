@@ -13,8 +13,11 @@ adb shell am start -S -W -n "org.box2d.Box3D/MainActivity" 2>&1 || true
 
 if [ "$DOTNET_EXIT" -ne 0 ]; then
   echo "=== Step 4: Manual diagnosis ==="
-  echo "--- Look for signed APK in bin/ ---"
-  SIGNED_APK=$(find /home/runner/.local/share/dotnet/runfile -name "*-Signed.apk" -o -name "*.apk" -not -path "*/obj/*" 2>/dev/null | head -1)
+  echo "--- Look for signed APK in bin/ (prefer *-Signed.apk) ---"
+  SIGNED_APK=$(find /home/runner/.local/share/dotnet/runfile -name "*-Signed.apk" 2>/dev/null | head -1)
+  if [ -z "$SIGNED_APK" ]; then
+    SIGNED_APK=$(find /home/runner/.local/share/dotnet/runfile/bin -name "*.apk" 2>/dev/null | head -1)
+  fi
   echo "Signed APK: $SIGNED_APK"
 
   echo "--- Look for debug keystore ---"
@@ -42,9 +45,10 @@ if [ "$DOTNET_EXIT" -ne 0 ]; then
   if [ -n "$UNSIGNED_APK" ] && [ -n "$KEYSTORE" ]; then
     APKSIGNER=$(find /usr/local/lib/android/sdk -name "apksigner" 2>/dev/null | head -1)
     if [ -n "$APKSIGNER" ]; then
-      cp "$UNSIGNED_APK" "${UNSIGNED_APK}.signed"
-      "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass pass:android "${UNSIGNED_APK}.signed" 2>&1 || echo "Manual sign failed"
-      adb install -r -d "${UNSIGNED_APK}.signed" 2>&1 || true
+      SIGNED_OUT="${UNSIGNED_APK%.apk}-signed.apk"
+      cp "$UNSIGNED_APK" "$SIGNED_OUT"
+      "$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass pass:android "$SIGNED_OUT" 2>&1 || echo "Manual sign failed"
+      adb install -r -d "$SIGNED_OUT" 2>&1 || true
       echo "After manual sign+install:"
       adb shell pm list packages 2>/dev/null | grep box2d || echo "STILL NOT INSTALLED"
     fi
