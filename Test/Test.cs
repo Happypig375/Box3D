@@ -120,7 +120,7 @@ public class MainActivity : Activity
 	protected override async void OnCreate(Bundle? savedInstanceState)
 	{
 		base.OnCreate(savedInstanceState);
-		await Task.Delay(10000); // Wait for dotnet run to detect process ID
+		await Task.Delay(60000); // Wait for dotnet run to detect process ID
 		Java.Lang.JavaSystem.Exit(Program.Main());
 	}
 }

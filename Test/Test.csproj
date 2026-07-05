@@ -8,7 +8,7 @@
     <!-- required by mobile -->
     <ApplicationId>org.box2d.Box3D</ApplicationId>
     <!-- using function pointers in structs as return types will crash Mono!! -->
-    <UseMonoRuntime>false</UseMonoRuntime>
+    <UseMonoRuntime Condition="false">false</UseMonoRuntime>
   </PropertyGroup>
 
     <ItemGroup>
