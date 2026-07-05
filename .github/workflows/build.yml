@@ -94,11 +94,26 @@ jobs:
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
-          XCODE_FLAGS="CODE_SIGNING_ALLOWED=NO"
           if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            XCODE_FLAGS="$XCODE_FLAGS SUPPORTS_MACCATALYST=YES TARGETED_DEVICE_FAMILY=6 SUPPORTED_PLATFORMS=macosx"
+            # CMake + Xcode doesn't natively support Mac Catalyst. We configure
+            # with CMAKE_SYSTEM_NAME=iOS (needed for compiler detection), then
+            # patch the generated project's build settings before building.
+            XCODE_PROJ="build-${{ matrix.platform.name }}/box3d.xcodeproj/project.pbxproj"
+            if [ -f "$XCODE_PROJ" ]; then
+              echo "Patching Xcode project for Mac Catalyst..."
+              # Override SUPPORTED_PLATFORMS (CMake sets it to iphoneos)
+              sed -i '' 's/SUPPORTED_PLATFORMS = iphoneos/SUPPORTED_PLATFORMS = macosx/g' "$XCODE_PROJ"
+              # Override TARGETED_DEVICE_FAMILY (CMake sets it to 1,2)
+              sed -i '' 's/TARGETED_DEVICE_FAMILY = "1,2"/TARGETED_DEVICE_FAMILY = "6"/g' "$XCODE_PROJ"
+              # Add SUPPORTS_MACCATALYST to the box3d target if not present
+              if ! grep -q "SUPPORTS_MACCATALYST" "$XCODE_PROJ"; then
+                sed -i '' '/PRODUCT_NAME = box3d;/a\
+                SUPPORTS_MACCATALYST = YES;
+          ' "$XCODE_PROJ"
+              fi
+            fi
           fi
-          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- $XCODE_FLAGS
+          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
 
       - name: Create framework
         run: |
@@ -289,18 +304,24 @@ jobs:
             echo "No iOS runtime found. Cannot create device."
             exit 1
           fi
-          if xcrun simctl list devices | grep -q "$RUNTIME_ID"; then
-            echo "A device with runtime $RUNTIME_ID already exists."
-          else
+          DEVICE_UDID=$(xcrun simctl list devices | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
+          if [ -z "$DEVICE_UDID" ]; then
             DEVICE_TYPE=$(xcrun simctl list devicetypes | grep -i "iPhone" | head -1 | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' || true)
             if [ -z "$DEVICE_TYPE" ]; then
               echo "No iPhone device type found; creating device with default type."
-              xcrun simctl create "Test Device" "$RUNTIME_ID"
+              DEVICE_UDID=$(xcrun simctl create "Test Device" "$RUNTIME_ID")
             else
               echo "Creating device: $DEVICE_TYPE"
-              xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID"
+              DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
             fi
           fi
+          echo "Device UDID: $DEVICE_UDID"
+          echo "device-udid=$DEVICE_UDID" >> "$GITHUB_OUTPUT"
+          # Boot the device and wait for it to be ready
+          xcrun simctl boot "$DEVICE_UDID" 2>&1 || true
+          # Wait for boot to complete
+          xcrun simctl bootstatus "$DEVICE_UDID" 2>&1 || true
+        id: create-ios-device
 
       - name: Download NuGet package
         uses: actions/download-artifact@v8
@@ -331,7 +352,13 @@ jobs:
         shell: bash
         run: |
           cd Scripts
-          dotnet run -f ${{ matrix.platform.tfm }} Test.cs
+          RID_FLAG=""
+          if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
+            RID_FLAG="-r iossimulator-arm64"
+          elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
+            RID_FLAG="-r maccatalyst-arm64"
+          fi
+          dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs
 
   nuget-push:
     name: Push to NuGet
