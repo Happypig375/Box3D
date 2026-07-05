@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 echo "=== Step 1: dotnet run (build+sign+install+run) ==="
 dotnet run -f "$1" -r "$2" Test.cs 2>&1

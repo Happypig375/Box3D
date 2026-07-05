@@ -362,15 +362,28 @@ jobs:
           xcrun simctl list devices 2>&1 || true
           echo "--- End device list ---"
           if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
-            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs 2>&1 || true
+            # Ensure there's a booted device with the correct runtime
+            RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-26-5"
+            DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
+            if [ -z "$DEVICE_UDID" ]; then
+              DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
+              echo "Creating device with runtime $RUNTIME_ID..."
+              DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
+              echo "Created device: $DEVICE_UDID"
+              xcrun simctl boot "$DEVICE_UDID" || true
+            fi
+            # Give it time to boot
+            xcrun simctl bootstatus "$DEVICE_UDID" -t 120 2>&1 || true
+            echo "Device status:"
+            xcrun simctl list devices 2>/dev/null | grep "$DEVICE_UDID" || true
+            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG --device "$DEVICE_UDID" Test.cs
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
             # dotnet run creates the .app bundle. Ignore the launch error
             # (no GUI session on CI), then find and run the executable directly.
             dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs 2>&1 || true
-            APP_DIR=$(find . -name "Test.app" -type d | head -1)
-            if [ -z "$APP_DIR" ]; then
-              APP_DIR=$(find ~/Library/Application\ Support/dotnet -name "Test.app" -type d 2>/dev/null | head -1)
-            fi
+            echo "=== Searching for .app bundle ==="
+            APP_DIR=$(find /Users -name "Test.app" -type d -maxdepth 8 2>/dev/null | head -1)
+            echo "APP_DIR=$APP_DIR"
             if [ -n "$APP_DIR" ]; then
               EXEC=$(find "$APP_DIR" -type f -perm +111 -maxdepth 3 | head -1)
               if [ -n "$EXEC" ]; then
@@ -378,6 +391,7 @@ jobs:
               else
                 echo "No executable found in $APP_DIR" >&2
                 ls -laR "$APP_DIR" 2>/dev/null | head -20
+                exit 1
               fi
             else
               echo "Could not find .app bundle anywhere" >&2
