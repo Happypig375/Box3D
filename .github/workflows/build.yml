@@ -94,7 +94,11 @@ jobs:
             -DBOX3D_UNIT_TESTS=OFF \
             -DBOX3D_VALIDATE=OFF
 
-          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO ${{ contains(matrix.platform.name, 'maccatalyst') && 'SUPPORTS_MACCATALYST=YES TARGETED_DEVICE_FAMILY=6' || '' }}
+          XCODE_FLAGS="CODE_SIGNING_ALLOWED=NO"
+          if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
+            XCODE_FLAGS="$XCODE_FLAGS SUPPORTS_MACCATALYST=YES TARGETED_DEVICE_FAMILY=6 SUPPORTED_PLATFORMS=macosx"
+          fi
+          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- $XCODE_FLAGS
 
       - name: Create framework
         run: |
@@ -267,17 +271,23 @@ jobs:
         with:
           xcode-version: ${{ steps.ios-version.outputs.xcode-version }}
 
+      - name: Ensure iOS Simulator runtime is available
+        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'ios')
+        shell: bash
+        run: |
+          # Ensure the iOS Simulator runtime for the installed Xcode is downloaded
+          xcodebuild -downloadPlatform iOS 2>&1 || true
+
       - name: Create iOS Simulator device for the found iOS version
         if: matrix.platform.mobile == true && contains(matrix.platform.name, 'ios')
         shell: bash
         run: |
           # Pick the latest available iOS runtime
-          RUNTIME_ID=$(xcrun simctl list runtimes | grep -E "iOS [0-9]" | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
+          RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
           echo "Target runtime: $RUNTIME_ID"
-          if ! xcrun simctl list runtimes | grep -q "$RUNTIME_ID"; then
-            echo "Runtime $RUNTIME_ID not found? Falling back to any iOS runtime."
-            RUNTIME_ID=$(xcrun simctl list runtimes | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
-            echo "Fallback runtime: $RUNTIME_ID"
+          if [ -z "$RUNTIME_ID" ]; then
+            echo "No iOS runtime found. Cannot create device."
+            exit 1
           fi
           if xcrun simctl list devices | grep -q "$RUNTIME_ID"; then
             echo "A device with runtime $RUNTIME_ID already exists."

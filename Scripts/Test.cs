@@ -25,7 +25,7 @@ using Android.Runtime;
 // with your rendering engine in your game engine.
 static class Program
 {
-	static unsafe int Main()
+	public static unsafe int Main()
 	{
         Console.WriteLine("Starting test...");
 
