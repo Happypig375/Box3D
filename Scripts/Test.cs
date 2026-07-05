@@ -3,7 +3,8 @@
 // All other packages resolve from nuget.org as usual.
 #:package Box3D@*
 #:property AllowUnsafeBlocks=true
-#:property ApplicationId=org.box2d.Box3D // required by ios
+// required by mobile
+#:property ApplicationId=org.box2d.Box3D
 #:property TargetFrameworks=net10.0;net10.0-ios;net10.0-android;net10.0-maccatalyst
 
 using System;
