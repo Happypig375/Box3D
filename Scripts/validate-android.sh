@@ -1,8 +1,13 @@
 #!/bin/bash
 
 echo "=== Step 1: dotnet run (build sign install run) ==="
+echo "--- Enable verbose output via Directory.Build.props ---"
+echo '<Project><PropertyGroup><AndroidRunExtraArgs>--verbose</AndroidRunExtraArgs></PropertyGroup></Project>' > Directory.Build.props
+export DOTNET_MSBUILD_VERBOSITY=normal
 dotnet run -f "$1" -r "$2" Test.cs 2>&1
 DOTNET_EXIT=$?
+rm -f Directory.Build.props
+unset DOTNET_MSBUILD_VERBOSITY
 echo "dotnet run exit code: $DOTNET_EXIT"
 
 echo "=== Step 2: Check installed package ==="

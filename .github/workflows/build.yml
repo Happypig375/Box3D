@@ -370,6 +370,9 @@ jobs:
             echo "=== Create device and check ==="
             RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
             echo "Selected runtime: $RUNTIME_ID"
+            # Dump simctl --json to see runtime versions
+            echo "=== simctl --json (runtimes only) ==="
+            xcrun simctl list --json 2>/dev/null | python3 -m json.tool 2>/dev/null | grep -A5 '"version"\|"name"\|"iOS"' | head -30 || xcrun simctl list --json 2>/dev/null | head -100
             DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
             if [ -z "$DEVICE_UDID" ]; then
               for old in $(xcrun simctl list devices 2>/dev/null | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'); do
