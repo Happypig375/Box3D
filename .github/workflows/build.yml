@@ -88,22 +88,27 @@ jobs:
       - name: Build
         run: |
           if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            # Use same Xcode generator as other iOS builds, then build with
-            # xcodebuild and force Mac Catalyst via -destination flag.
+            # Mac Catalyst: use Unix Makefiles with an explicit target triple
+            # (arm64-apple-ios15.0-macabi). The Xcode generator always produces
+            # iOS binaries regardless of xcodebuild overrides.
+            SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
             cmake -S box3d -B build-${{ matrix.platform.name }} \
-              -GXcode \
-              -DCMAKE_SYSTEM_NAME=iOS \
+              -G "Unix Makefiles" \
+              -DCMAKE_C_COMPILER=clang \
+              -DCMAKE_CXX_COMPILER=clang++ \
+              -DCMAKE_OSX_SYSROOT="$SDKROOT" \
               -DCMAKE_OSX_ARCHITECTURES=arm64 \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+              -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+              -DCMAKE_C_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_CXX_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
               -DBUILD_SHARED_LIBS=ON \
               -DBOX3D_SAMPLES=OFF \
               -DBOX3D_UNIT_TESTS=OFF \
               -DBOX3D_VALIDATE=OFF
-            xcodebuild -project build-${{ matrix.platform.name }}/box3d.xcodeproj \
-              -target box3d \
-              -configuration $BUILD_TYPE \
-              -destination "platform=macOS,variant=Mac Catalyst,arch=arm64" \
-              CODE_SIGNING_ALLOWED=NO
+            cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE
           else
             cmake -S box3d -B build-${{ matrix.platform.name }} \
               ${{ matrix.platform.flags }} \
@@ -325,10 +330,22 @@ jobs:
             exit 1
           fi
           echo "Target runtime: $RUNTIME_ID"
-          DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
+          DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
           if [ -z "$DEVICE_UDID" ]; then
             DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -i "iPhone" | head -1 | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' || true)
             if [ -z "$DEVICE_TYPE" ]; then
+              # Fall back to well-known iPhone types
+              for known in "iPhone-17-Pro" "iPhone-16-Pro" "iPhone-15-Pro" "iPhone-14-Pro" "iPhone-SE"; do
+                DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.$known"
+                if xcrun simctl list devicetypes 2>/dev/null | grep -q "$known"; then
+                  echo "Found device type: $DEVICE_TYPE"
+                  break
+                fi
+                DEVICE_TYPE=""
+              done
+            fi
+            if [ -z "$DEVICE_TYPE" ]; then
+              # Last resort: try any available device type
               DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' | head -1 || true)
             fi
             if [ -z "$DEVICE_TYPE" ]; then
@@ -366,10 +383,12 @@ jobs:
           profile: pixel_5
           emulator-boot-timeout: 1800 # 30 minutes
           force-avd-creation: false
-          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          emulator-options: -no-snapshot-load -no-snapshot-save -wipe-data -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           working-directory: Scripts # Don't do cd in script as it's executed in a new bash every line
-          script: dotnet run -f ${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} Test.cs
+          script: |
+            adb uninstall org.box2d.Box3D 2>/dev/null || true
+            dotnet run -f ${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} Test.cs
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
