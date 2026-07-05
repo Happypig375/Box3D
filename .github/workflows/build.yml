@@ -453,6 +453,7 @@ jobs:
     name: Push to NuGet
     runs-on: ubuntu-latest
     needs: validate
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v7
       - name: Download NuGet package

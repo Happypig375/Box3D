@@ -10,7 +10,8 @@ using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.Runtime;
-using Android.Util;
+using System.Threading;
+using System.Threading.Tasks;
 #endif
 
 // https://github.com/erincatto/box3d/blob/1bec63c9ee9b8a5bb54900f201c872585ee23260/test/test_world.c#L16-L101
@@ -24,13 +25,15 @@ static class Program
 {
 	public static unsafe int Main()
 	{
+        Console.WriteLine("Starting test...");
+
 		// Construct a world object, which will hold and simulate the rigid bodies.
 		b3WorldDef worldDef = b3DefaultWorldDef();
 		worldDef.gravity = new b3Vec3 { x = 0.0f, y = -10.0f, z = 0.0f };
 
 		b3WorldId worldId = b3CreateWorld( &worldDef );
 		if ( !b3World_IsValid( worldId ) )
-			return 3001;
+			return 1;
 
 		// Define the ground body.
 		b3BodyDef groundBodyDef = b3DefaultBodyDef();
@@ -41,7 +44,7 @@ static class Program
 		// The body is also added to the world.
 		b3BodyId groundId = b3CreateBody( worldId, &groundBodyDef );
 		if ( !b3Body_IsValid( groundId ) )
-			return 3002;
+			return 1;
 
 		// Define the ground box shape. The extents are the half-widths of the box.
 		b3BoxHull groundBox = b3MakeBoxHull( 50.0f, 10.0f, 50.0f );
@@ -100,11 +103,11 @@ static class Program
 		b3DestroyWorld( worldId );
 
 		if ( Math.Abs( position.y - 1.00f ) > 0.01f )
-			return 3003;
+			return 1;
 		if ( Math.Abs( rotation.v.x ) > 0.01f )
-			return 3004;
+			return 1;
 		if ( Math.Abs( rotation.v.z ) > 0.01f )
-			return 3005;
+			return 1;
 
         Console.WriteLine("Test succeeded.");
 		return 0;
@@ -118,20 +121,12 @@ public class MainActivity : Activity
 	protected override void OnCreate(Bundle? savedInstanceState)
 	{
 		base.OnCreate(savedInstanceState);
-
-		// Run the test on a background thread so dotnet run can attach to the process
-		System.Threading.Tasks.Task.Run(() =>
-		{
-			try {
+		Task.Factory.StartNew(() => Thread.Sleep(3000))
+            .ContinueWith((t) =>
+			{
 				int result = Program.Main();
-
-				// Kill the process so dotnet run's pidof loop detects exit
-				Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
-			} catch (Exception ex) {
-				Console.WriteLine($"Exception: {ex}");
-				Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
-			}
-		});
+				Java.Lang.JavaSystem.Exit(result);
+			});
 	}
 }
 #endif
