@@ -302,68 +302,21 @@ jobs:
           if [[ "$XCODE_VER" == "latest-stable" ]]; then
             LATEST=$(xcrun simctl list runtimes 2>/dev/null | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
             echo "Using latest stable runtime: $LATEST"
-            echo "runtime-id=$LATEST" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           EXPECTED_RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-$(echo "$XCODE_VER" | tr . -)"
           echo "Expected runtime: $EXPECTED_RUNTIME (Xcode $XCODE_VER)"
           if xcrun simctl list runtimes 2>/dev/null | grep -q "$EXPECTED_RUNTIME"; then
             echo "Runtime already installed."
-            echo "runtime-id=$EXPECTED_RUNTIME" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Runtime not found. Downloading..."
           xcodebuild -downloadPlatform iOS 2>&1 || echo "Download failed or not supported"
           if xcrun simctl list runtimes 2>/dev/null | grep -q "$EXPECTED_RUNTIME"; then
             echo "Runtime installed after download."
-            echo "runtime-id=$EXPECTED_RUNTIME" >> "$GITHUB_OUTPUT"
           else
-            LATEST=$(xcrun simctl list runtimes 2>/dev/null | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
-            echo "Could not get exact runtime. Falling back to: $LATEST"
-            echo "runtime-id=$LATEST" >> "$GITHUB_OUTPUT"
+            echo "Could not get exact runtime."
           fi
-        id: ios-runtime
-
-      - name: Create and boot iOS Simulator device
-        if: matrix.platform.mobile == true && contains(matrix.platform.name, 'ios')
-        shell: bash
-        run: |
-          RUNTIME_ID="${{ steps.ios-runtime.outputs.runtime-id }}"
-          if [ -z "$RUNTIME_ID" ]; then
-            echo "No runtime ID available. Cannot create device."
-            exit 1
-          fi
-          echo "Target runtime: $RUNTIME_ID"
-          DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
-          if [ -z "$DEVICE_UDID" ]; then
-            DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -i "iPhone" | head -1 | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' || true)
-            if [ -z "$DEVICE_TYPE" ]; then
-              # Fall back to well-known iPhone types
-              for known in "iPhone-17-Pro" "iPhone-16-Pro" "iPhone-15-Pro" "iPhone-14-Pro" "iPhone-SE"; do
-                DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.$known"
-                if xcrun simctl list devicetypes 2>/dev/null | grep -q "$known"; then
-                  echo "Found device type: $DEVICE_TYPE"
-                  break
-                fi
-                DEVICE_TYPE=""
-              done
-            fi
-            if [ -z "$DEVICE_TYPE" ]; then
-              # Last resort: try any available device type
-              DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' | head -1 || true)
-            fi
-            if [ -z "$DEVICE_TYPE" ]; then
-              echo "No device type found. Cannot create device."
-              exit 1
-            fi
-            echo "Creating device: $DEVICE_TYPE"
-            DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
-          fi
-          echo "Device UDID: $DEVICE_UDID"
-          echo "device-udid=$DEVICE_UDID" >> "$GITHUB_OUTPUT"
-          xcrun simctl boot "$DEVICE_UDID" 2>&1 || true
-          xcrun simctl bootstatus "$DEVICE_UDID" 2>&1 || true
-        id: create-ios-device
 
       - name: Download NuGet package
         uses: actions/download-artifact@v8
@@ -406,18 +359,29 @@ jobs:
           fi
           # List available devices for debugging
           echo "--- Available simulator devices ---"
-          xcrun simctl list devices 2>&1 | grep -E "iOS|--" || true
+          xcrun simctl list devices 2>&1 || true
           echo "--- End device list ---"
-          if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            # Build the app and run the executable directly, bypassing
-            # LaunchServices which fails on headless CI.
-            dotnet build -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs
-            # Find and run the native executable from the app bundle
-            APP_DIR=$(find . -name "Test.app" -type d -path "*/debug_*" | head -1)
-            if [ -n "$APP_DIR" ] && [ -f "$APP_DIR/Test" ]; then
-              "$APP_DIR/Test"
+          if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
+            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs 2>&1 || true
+          elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
+            # dotnet run creates the .app bundle. Ignore the launch error
+            # (no GUI session on CI), then find and run the executable directly.
+            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs 2>&1 || true
+            APP_DIR=$(find . -name "Test.app" -type d | head -1)
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR=$(find ~/Library/Application\ Support/dotnet -name "Test.app" -type d 2>/dev/null | head -1)
+            fi
+            if [ -n "$APP_DIR" ]; then
+              EXEC=$(find "$APP_DIR" -type f -perm +111 -maxdepth 3 | head -1)
+              if [ -n "$EXEC" ]; then
+                "$EXEC"
+              else
+                echo "No executable found in $APP_DIR" >&2
+                ls -laR "$APP_DIR" 2>/dev/null | head -20
+              fi
             else
-              echo "Warning: Could not find Test.app executable, but build succeeded."
+              echo "Could not find .app bundle anywhere" >&2
+              exit 1
             fi
           else
             dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs
