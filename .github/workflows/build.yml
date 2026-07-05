@@ -216,8 +216,7 @@ jobs:
           - { name: linux-x64,       os: ubuntu-latest,    tfm: net10.0 }
           - { name: linux-arm64,     os: *ubuntu-latest-arm, tfm: net10.0 }
           - { name: osx-arm64,       os: macos-latest,     tfm: net10.0 }
-          # Mobile platforms — run with mobile workloads
-          - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android,    abi: arm64-v8a }
+          - { name: android-arm64,   os: *ubuntu-latest-arm,    tfm: net10.0-android,    abi: arm64-v8a }
           - { name: android-x64,     os: ubuntu-latest,    tfm: net10.0-android,    abi: x86_64 }
           - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net10.0-ios } # Don't validate iOS as it requires a real device
           - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net10.0-maccatalyst }
@@ -241,6 +240,8 @@ jobs:
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
+        with:
+          dotnet-quality: preview # using function pointers in structs as return types will crash Mono! we need to use CoreCLR on mobile and mac catalyst
 
       # Mobile workloads
       - name: Install Android workload
