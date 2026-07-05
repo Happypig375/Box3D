@@ -343,7 +343,7 @@ jobs:
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           working-directory: Test # Don't do cd in script as it's executed in a new bash every line
-          script: dotnet run -f "${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}"
+          script: dotnet run -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}"
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
@@ -398,11 +398,11 @@ jobs:
             fi
             echo "=== Device status ==="
             xcrun simctl list devices 2>&1 || true
-            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} $RID_FLAG
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
             # dotnet run creates the .app bundle. Ignore the launch error
             # (no GUI session on CI), then find and run the executable directly.
-            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} $RID_FLAG
             echo "=== Searching for .app bundle ==="
             # Prefer bin/ path over obj/ (codesign staging copy has no executable)
             APP_DIR=$(find /Users -path "*/bin/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
@@ -446,7 +446,7 @@ jobs:
               exit 1
             fi
           else
-            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} $RID_FLAG
           fi
 
   nuget-push:
