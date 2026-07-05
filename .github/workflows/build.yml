@@ -363,26 +363,38 @@ jobs:
           echo "--- End device list ---"
           if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
             # Ensure there's a booted device with the correct runtime
-            RUNTIME_ID="com.apple.CoreSimulator.SimRuntime.iOS-26-5"
-            DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
+            # Get the exact runtime ID from the list of installed runtimes
+            RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
+            echo "Using runtime: $RUNTIME_ID"
+            # Find a booted device with this runtime
+            DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep -B1 -A0 "Booted" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
             if [ -z "$DEVICE_UDID" ]; then
+              # Delete old devices
+              for old in $(xcrun simctl list devices 2>/dev/null | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'); do
+                xcrun simctl delete "$old" 2>/dev/null || true
+              done
               DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
               echo "Creating device with runtime $RUNTIME_ID..."
               DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
               echo "Created device: $DEVICE_UDID"
-              xcrun simctl boot "$DEVICE_UDID" || true
+              xcrun simctl boot "$DEVICE_UDID" 2>&1 || true
+              xcrun simctl bootstatus "$DEVICE_UDID" -t 120 2>&1 || true
             fi
-            # Give it time to boot
-            xcrun simctl bootstatus "$DEVICE_UDID" -t 120 2>&1 || true
             echo "Device status:"
-            xcrun simctl list devices 2>/dev/null | grep "$DEVICE_UDID" || true
-            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG --device "$DEVICE_UDID" Test.cs
+            xcrun simctl list devices 2>&1 || true
+            dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
             # dotnet run creates the .app bundle. Ignore the launch error
             # (no GUI session on CI), then find and run the executable directly.
             dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs 2>&1 || true
             echo "=== Searching for .app bundle ==="
-            APP_DIR=$(find /Users -name "Test.app" -type d -maxdepth 8 2>/dev/null | head -1)
+            APP_DIR=$(find /Users -name "Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR=$(find /Users -path "*/dotnet/runfile/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
+            fi
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR=$(find /Users/runner/Library -name "Test.app" -type d -maxdepth 8 2>/dev/null | head -1)
+            fi
             echo "APP_DIR=$APP_DIR"
             if [ -n "$APP_DIR" ]; then
               EXEC=$(find "$APP_DIR" -type f -perm +111 -maxdepth 3 | head -1)
