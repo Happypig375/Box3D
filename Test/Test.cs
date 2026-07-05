@@ -10,7 +10,6 @@ using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.Runtime;
-using System.Threading;
 using System.Threading.Tasks;
 #endif
 
@@ -118,15 +117,11 @@ static class Program
 [Activity(Label = "Box3D Test", MainLauncher = true)]
 public class MainActivity : Activity
 {
-	protected override void OnCreate(Bundle? savedInstanceState)
+	protected override async void OnCreate(Bundle? savedInstanceState)
 	{
 		base.OnCreate(savedInstanceState);
-		Task.Factory.StartNew(() => Thread.Sleep(3000))
-            .ContinueWith((t) =>
-			{
-				int result = Program.Main();
-				Java.Lang.JavaSystem.Exit(result);
-			});
+		await Task.Delay(10000); // Wait for dotnet run to detect process ID
+		Java.Lang.JavaSystem.Exit(Program.Main());
 	}
 }
 #endif
