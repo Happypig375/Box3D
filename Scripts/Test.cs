@@ -6,6 +6,8 @@
 // required by mobile
 #:property ApplicationId=org.box2d.Box3D
 #:property TargetFrameworks=net10.0;net10.0-ios;net10.0-android;net10.0-maccatalyst
+// using function pointers in structs as return types will crash Mono!!
+#:property UseMonoRuntime=false
 
 using System;
 using Box3D;
