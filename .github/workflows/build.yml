@@ -95,25 +95,29 @@ jobs:
             -DBOX3D_VALIDATE=OFF
 
           if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            # CMake + Xcode doesn't natively support Mac Catalyst. We configure
-            # with CMAKE_SYSTEM_NAME=iOS (needed for compiler detection), then
-            # patch the generated project's build settings before building.
-            XCODE_PROJ="build-${{ matrix.platform.name }}/box3d.xcodeproj/project.pbxproj"
-            if [ -f "$XCODE_PROJ" ]; then
-              echo "Patching Xcode project for Mac Catalyst..."
-              # Override SUPPORTED_PLATFORMS (CMake sets it to iphoneos)
-              sed -i '' 's/SUPPORTED_PLATFORMS = iphoneos/SUPPORTED_PLATFORMS = macosx/g' "$XCODE_PROJ"
-              # Override TARGETED_DEVICE_FAMILY (CMake sets it to 1,2)
-              sed -i '' 's/TARGETED_DEVICE_FAMILY = "1,2"/TARGETED_DEVICE_FAMILY = "6"/g' "$XCODE_PROJ"
-              # Add SUPPORTS_MACCATALYST to the box3d target if not present
-              if ! grep -q "SUPPORTS_MACCATALYST" "$XCODE_PROJ"; then
-                sed -i '' '/PRODUCT_NAME = box3d;/a\
-                SUPPORTS_MACCATALYST = YES;
-          ' "$XCODE_PROJ"
-              fi
-            fi
+            # Mac Catalyst: use Unix Makefiles with an explicit target triple
+            # (arm64-apple-ios15.0-macabi). The Xcode generator produces iOS
+            # binaries that can't be overridden at build time, so we avoid it.
+            # CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY skips linker tests
+            # that would fail with a non-macOS sysroot.
+            cmake -S box3d -B build-${{ matrix.platform.name }} \
+              -G "Unix Makefiles" \
+              -DCMAKE_SYSTEM_NAME=iOS \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+              -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+              -DCMAKE_C_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_CXX_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
+              -DBUILD_SHARED_LIBS=ON \
+              -DBOX3D_SAMPLES=OFF \
+              -DBOX3D_UNIT_TESTS=OFF \
+              -DBOX3D_VALIDATE=OFF
+            cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE
+          else
+            cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
           fi
-          cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
 
       - name: Create framework
         run: |
@@ -286,40 +290,62 @@ jobs:
         with:
           xcode-version: ${{ steps.ios-version.outputs.xcode-version }}
 
-      - name: Ensure iOS Simulator runtime is available
+      - name: Ensure iOS Simulator runtime matches Xcode version
         if: matrix.platform.mobile == true && contains(matrix.platform.name, 'ios')
         shell: bash
         run: |
-          # Ensure the iOS Simulator runtime for the installed Xcode is downloaded
-          xcodebuild -downloadPlatform iOS 2>&1 || true
+          XCODE_VER="${{ steps.ios-version.outputs.xcode-version }}"
+          if [[ "$XCODE_VER" == "latest-stable" ]]; then
+            LATEST=$(xcrun simctl list runtimes 2>/dev/null | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
+            echo "Using latest stable runtime: $LATEST"
+            echo "runtime-id=$LATEST" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          EXPECTED_RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-$(echo "$XCODE_VER" | tr . -)"
+          echo "Expected runtime: $EXPECTED_RUNTIME (Xcode $XCODE_VER)"
+          if xcrun simctl list runtimes 2>/dev/null | grep -q "$EXPECTED_RUNTIME"; then
+            echo "Runtime already installed."
+            echo "runtime-id=$EXPECTED_RUNTIME" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Runtime not found. Downloading..."
+          xcodebuild -downloadPlatform iOS 2>&1 || echo "Download failed or not supported"
+          if xcrun simctl list runtimes 2>/dev/null | grep -q "$EXPECTED_RUNTIME"; then
+            echo "Runtime installed after download."
+            echo "runtime-id=$EXPECTED_RUNTIME" >> "$GITHUB_OUTPUT"
+          else
+            LATEST=$(xcrun simctl list runtimes 2>/dev/null | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
+            echo "Could not get exact runtime. Falling back to: $LATEST"
+            echo "runtime-id=$LATEST" >> "$GITHUB_OUTPUT"
+          fi
+        id: ios-runtime
 
-      - name: Create iOS Simulator device for the found iOS version
+      - name: Create and boot iOS Simulator device
         if: matrix.platform.mobile == true && contains(matrix.platform.name, 'ios')
         shell: bash
         run: |
-          # Pick the latest available iOS runtime
-          RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep -E "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
-          echo "Target runtime: $RUNTIME_ID"
+          RUNTIME_ID="${{ steps.ios-runtime.outputs.runtime-id }}"
           if [ -z "$RUNTIME_ID" ]; then
-            echo "No iOS runtime found. Cannot create device."
+            echo "No runtime ID available. Cannot create device."
             exit 1
           fi
-          DEVICE_UDID=$(xcrun simctl list devices | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
+          echo "Target runtime: $RUNTIME_ID"
+          DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1)
           if [ -z "$DEVICE_UDID" ]; then
-            DEVICE_TYPE=$(xcrun simctl list devicetypes | grep -i "iPhone" | head -1 | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' || true)
+            DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -i "iPhone" | head -1 | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' || true)
             if [ -z "$DEVICE_TYPE" ]; then
-              echo "No iPhone device type found; creating device with default type."
-              DEVICE_UDID=$(xcrun simctl create "Test Device" "$RUNTIME_ID")
-            else
-              echo "Creating device: $DEVICE_TYPE"
-              DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
+              DEVICE_TYPE=$(xcrun simctl list devicetypes 2>/dev/null | grep -o 'com\.apple\.CoreSimulator\.SimDeviceType\.[^ )]*' | head -1 || true)
             fi
+            if [ -z "$DEVICE_TYPE" ]; then
+              echo "No device type found. Cannot create device."
+              exit 1
+            fi
+            echo "Creating device: $DEVICE_TYPE"
+            DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
           fi
           echo "Device UDID: $DEVICE_UDID"
           echo "device-udid=$DEVICE_UDID" >> "$GITHUB_OUTPUT"
-          # Boot the device and wait for it to be ready
           xcrun simctl boot "$DEVICE_UDID" 2>&1 || true
-          # Wait for boot to complete
           xcrun simctl bootstatus "$DEVICE_UDID" 2>&1 || true
         id: create-ios-device
 
