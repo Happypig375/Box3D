@@ -362,25 +362,35 @@ jobs:
           xcrun simctl list devices 2>&1 || true
           echo "--- End device list ---"
           if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
-            # Ensure there's a booted device with the correct runtime
-            # Get the exact runtime ID from the list of installed runtimes
+            # Debug: dump runtime and device info to see why .NET reads 26.5 as 26.0
+            echo "=== Installed runtimes ==="
+            xcrun simctl list runtimes 2>&1 || true
+            echo "=== Current devices ==="
+            xcrun simctl list devices 2>&1 || true
+            echo "=== Create device and check ==="
             RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep "iOS " | tail -1 | grep -o 'com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*' | head -1)
-            echo "Using runtime: $RUNTIME_ID"
-            # Find a booted device with this runtime
-            DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep -B1 -A0 "Booted" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
+            echo "Selected runtime: $RUNTIME_ID"
+            DEVICE_UDID=$(xcrun simctl list devices 2>/dev/null | grep "$RUNTIME_ID" | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | head -1 || true)
             if [ -z "$DEVICE_UDID" ]; then
-              # Delete old devices
               for old in $(xcrun simctl list devices 2>/dev/null | grep -E -o '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'); do
                 xcrun simctl delete "$old" 2>/dev/null || true
               done
               DEVICE_TYPE="com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro"
-              echo "Creating device with runtime $RUNTIME_ID..."
               DEVICE_UDID=$(xcrun simctl create "Test Device" "$DEVICE_TYPE" "$RUNTIME_ID")
-              echo "Created device: $DEVICE_UDID"
+              echo "Created: $DEVICE_UDID"
+              # Dump device properties
+              echo "=== Device plist ==="
+              plutil -p ~/Library/Developer/CoreSimulator/Devices/$DEVICE_UDID/device.plist 2>/dev/null || true
+              echo "=== Runtime plist ==="
+              RUNTIME_PATH=$(xcrun simctl list runtimes 2>/dev/null | grep "$RUNTIME_ID" | grep -o '/.*' | head -1)
+              echo "Runtime path: $RUNTIME_PATH"
+              if [ -n "$RUNTIME_PATH" ]; then
+                plutil -p "$RUNTIME_PATH" 2>/dev/null || true
+              fi
               xcrun simctl boot "$DEVICE_UDID" 2>&1 || true
               xcrun simctl bootstatus "$DEVICE_UDID" -t 120 2>&1 || true
             fi
-            echo "Device status:"
+            echo "=== Device status ==="
             xcrun simctl list devices 2>&1 || true
             dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
@@ -388,7 +398,11 @@ jobs:
             # (no GUI session on CI), then find and run the executable directly.
             dotnet run -f ${{ matrix.platform.tfm }} $RID_FLAG Test.cs 2>&1 || true
             echo "=== Searching for .app bundle ==="
-            APP_DIR=$(find /Users -name "Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
+            # Prefer bin/ path over obj/ (codesign staging copy has no executable)
+            APP_DIR=$(find /Users -path "*/bin/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR=$(find /Users -name "Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
+            fi
             if [ -z "$APP_DIR" ]; then
               APP_DIR=$(find /Users -path "*/dotnet/runfile/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
             fi
