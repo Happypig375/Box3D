@@ -217,11 +217,26 @@ jobs:
           - { name: linux-arm64,     os: *ubuntu-latest-arm, tfm: net10.0 }
           - { name: osx-arm64,       os: macos-latest,     tfm: net10.0 }
           # - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android } # for some reason the app won't install
-          - { name: android-x64,     os: ubuntu-latest,    tfm: net10.0-android }
-          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net10.0-ios } # Don't validate iOS as it requires a real device
-          - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net10.0-maccatalyst }
+          - { name: android-x64,     os: ubuntu-latest,    tfm: net11.0-android }
+          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios } # Don't validate iOS as it requires a real device
+          - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net11.0-maccatalyst }
     steps:
       - uses: actions/checkout@v7
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 11.x
+          dotnet-quality: preview # using function pointers in structs as return types will crash Mono! we need to use CoreCLR on mobile and mac catalyst
+      # Mobile workloads
+      - name: Install Android workload
+        if: contains(matrix.platform.name, 'android')
+        run: dotnet workload install android
+      - name: Install iOS workload
+        if: contains(matrix.platform.name, 'ios')
+        run: dotnet workload install ios
+      - name: Install Mac Catalyst workload
+        if: contains(matrix.platform.name, 'maccatalyst')
+        run: dotnet workload install maccatalyst
 
       # Android SDK (only needed for Android validation)
       - name: Setup JDK
@@ -238,22 +253,6 @@ jobs:
         run: |
           sdkmanager --install "platforms;android-$ANDROID_PLATFORM_VER"
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 11.x
-          dotnet-quality: preview # using function pointers in structs as return types will crash Mono! we need to use CoreCLR on mobile and mac catalyst
-
-      # Mobile workloads
-      - name: Install Android workload
-        if: contains(matrix.platform.name, 'android')
-        run: dotnet workload install android
-      - name: Install iOS workload
-        if: contains(matrix.platform.name, 'ios')
-        run: dotnet workload install ios
-      - name: Install Mac Catalyst workload
-        if: contains(matrix.platform.name, 'maccatalyst')
-        run: dotnet workload install maccatalyst
       # Apple syncs version numbers across iOS, macOS, and Xcode; the .NET iOS
       # workload version matches: 26.5.10284 → iOS 26.5 → Xcode 26.5.
       # (https://github.com/dotnet/macios/issues/25818#issuecomment-4799784136)
