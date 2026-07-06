@@ -39,7 +39,7 @@ static class PostProcessor
         content = Regex.Replace(content, @"\bsqrtf\s*\(", "System.MathF.Sqrt(");
         content = Regex.Replace(content, @"\bremainderf\s*\(", "System.MathF.IEEERemainder(");
         content = Regex.Replace(content, @"\bfabsf\s*\(", "System.MathF.Abs(");
-        content = Regex.Replace(content, @"\bnextafterf\s*\(\s*(\w+)\s*,\s*(-?)3\.402823466e\+38F\)", match =>
+        content = Regex.Replace(content, @"\bnextafterf\s*\(\s*(\w+)\s*,\s*(-?)3\.4028234\d*[eE]\+38[fF]\)", match =>
         {
             var arg1 = match.Groups[1].Value;
             var arg2 = match.Groups[2].Value;
