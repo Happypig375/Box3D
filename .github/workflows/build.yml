@@ -65,7 +65,7 @@ jobs:
         run: ./build-native.sh
 
       - name: Compress native directory
-        run: tar -cvf native-${{ matrix.large-worlds }}-${{ matrix.platform.name }}.tar native/${{ matrix.large-worlds && 'large-worlds/' || '' }}${{ case(!contains(matrix.platform.name, 'android'), matrix.platform.name, format('android/{0}', matrix.platform.abi)) }}
+        run: tar -cvf native-${{ matrix.large-worlds }}-${{ matrix.platform.name }}.tar native/${{ matrix.large-worlds && 'large-worlds/' }}${{ case(!contains(matrix.platform.name, 'android'), matrix.platform.name, format('android/{0}', matrix.platform.abi)) }}
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
@@ -101,7 +101,7 @@ jobs:
         uses: ./.github/actions/setup-dotnet-clang
       - name: Pack NuGet package
         shell: bash
-        run: dotnet pack ${{ matrix.large-worlds && 'Box3D.LargeWorlds/Box3D.LargeWorlds.csproj' || '' }} -c $BUILD_TYPE -o ./artifacts
+        run: dotnet pack ${{ matrix.large-worlds && 'Box3D.LargeWorlds/Box3D.LargeWorlds.csproj' }} -c $BUILD_TYPE -o ./artifacts
       - name: Upload NuGet package artifact
         uses: actions/upload-artifact@v7
         with:
@@ -218,7 +218,7 @@ jobs:
 
       - name: Validate build
         if: matrix.platform.build-only
-        run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' || '' }}
+        run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
       # For Android: start emulator and run validation inside its script parameter
       - name: Enable KVM # Speeds up emulator startup time from 15 minutes to 2.5 minutes
@@ -241,7 +241,7 @@ jobs:
             dotnet run
             -p TargetFrameworks="${{ matrix.platform.tfm }}"
             -r "${{ matrix.platform.name }}"
-            ${{ case(matrix.large-worlds, '-p:LargeWorlds=true', '') }}
+            ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
@@ -251,9 +251,9 @@ jobs:
           cd Test
           if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
             UDID=$(xcrun simctl list devices | awk '/-- iOS ${{ steps.ios-version.outputs.xcode-version }} --/{flag=1;next}/--/{flag=0}flag' | grep -m1 -oE '[0-9A-F-]{36}')
-            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID -p SupportedOSPlatformVersion=26.0 ${{ case(matrix.large-worlds, '-p:LargeWorlds=true', '') }}
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID -p SupportedOSPlatformVersion=26.0 ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ case(matrix.large-worlds, '-p:LargeWorlds=true', '') }}
+            dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
             echo "=== Searching for .app bundle ==="
             APP_DIR=$(find /Users -path "*/bin/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
             if [ -z "$APP_DIR" ]; then
@@ -280,7 +280,7 @@ jobs:
               exit 1
             fi
           else
-            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ case(matrix.large-worlds, '-p:LargeWorlds=true', '') }}
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
           fi
 
   nuget-push:
