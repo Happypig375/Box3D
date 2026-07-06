@@ -28,7 +28,7 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "commit=$(cd box3d && git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-            echo "msg=$(cd box3d && git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+            echo "msg=$(cd box3d && git log -1 --pretty=%B)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up .NET and Clang
@@ -48,7 +48,7 @@ jobs:
           cat > /tmp/commit_msg <<'GITCOMMIT_EOF'
           Update box3d to https://github.com/erincatto/box3d/commit/${{ steps.check.outputs.commit }}
 
-          ${{ steps.check.outputs.msg }}
+          ## ${{ steps.check.outputs.msg }}
           GITCOMMIT_EOF
           git commit -F /tmp/commit_msg
           git push
