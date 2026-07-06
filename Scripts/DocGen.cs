@@ -217,35 +217,40 @@ string? ExtractCommentBlock(string[] lines, ref int idx)
     return (parms.Count > 0 ? parms : null, returns);
 }
 
-(string? name, string? file) GetMemberName(string line, string ctxType, string ctxName)
+(string[] names, string? file) GetMemberName(string line, string ctxType, string ctxName)
 {
     var t = line.Trim();
 
     // B3_API function
     var m = R.B3ApiFunc.Match(t);
-    if (m.Success) return ("Box3D." + m.Groups[1].Value, "Box3D.xml");
+    if (m.Success) return (new[] { "Box3D." + m.Groups[1].Value }, "Box3D.xml");
 
-    // struct field (inside struct body)
+    // struct/union closing brace: } TypeName;
+    m = R.StructClose.Match(t);
+    if (m.Success) return (new[] { m.Groups[1].Value }, m.Groups[1].Value + ".xml");
+
+    // struct field (inside struct/union body): return ALL field names (split by comma for multi-field)
     if (ctxType == "struct" || ctxType == "union")
     {
         m = R.StructField.Match(t);
         if (m.Success && !string.IsNullOrEmpty(ctxName))
-            return (ctxName + "." + m.Groups[1].Value, ctxName + ".xml");
+        {
+            var fieldNames = m.Groups[1].Value.Split(',').Select(f => f.Trim()).Where(f => f.Length > 0).ToArray();
+            var qualified = fieldNames.Select(f => ctxName + "." + f).ToArray();
+            if (qualified.Length > 0)
+                return (qualified, ctxName + ".xml");
+        }
     }
-
-    // struct/union closing brace: } TypeName;
-    m = R.StructClose.Match(t);
-    if (m.Success) return (m.Groups[1].Value, m.Groups[1].Value + ".xml");
 
     // enum value
     if (ctxType == "enum")
     {
         m = R.EnumValEq.Match(t);
         if (m.Success && !string.IsNullOrEmpty(ctxName))
-            return (ctxName + "." + m.Groups[1].Value, ctxName + ".xml");
+            return (new[] { ctxName + "." + m.Groups[1].Value }, ctxName + ".xml");
         m = R.EnumVal.Match(t);
         if (m.Success && !string.IsNullOrEmpty(ctxName))
-            return (ctxName + "." + m.Groups[1].Value, ctxName + ".xml");
+            return (new[] { ctxName + "." + m.Groups[1].Value }, ctxName + ".xml");
     }
 
     // struct/union opening declaration: typedef struct|union Name (opening brace on next line)
@@ -254,23 +259,32 @@ string? ExtractCommentBlock(string[] lines, ref int idx)
     {
         var typeName = m.Groups[3].Value;
         if (!string.IsNullOrEmpty(typeName))
-            return (typeName, typeName + ".xml");
+            return (new[] { typeName }, typeName + ".xml");
+    }
+
+    // enum opening declaration: typedef enum Name (opening brace on next line)
+    m = R.TypedefEnumType.Match(t);
+    if (m.Success)
+    {
+        var typeName = m.Groups[2].Value;
+        if (!string.IsNullOrEmpty(typeName))
+            return (new[] { typeName }, typeName + ".xml");
     }
 
     // function pointer typedef: typedef ... (*Name)...
     m = R.FnPtrTypedef.Match(t);
-    if (m.Success) return ("Box3D." + m.Groups[1].Value, "Box3D.xml");
+    if (m.Success) return (new[] { "Box3D." + m.Groups[1].Value }, "Box3D.xml");
 
     // function pointer typedef with direct syntax: typedef returnType Name(params)
     // e.g. typedef void* b3AllocFcn( int32_t size, int32_t alignment );
     m = R.TypedefFuncPtr.Match(t);
-    if (m.Success) return (m.Groups[1].Value, m.Groups[1].Value + ".xml");
+    if (m.Success) return (new[] { m.Groups[1].Value }, m.Groups[1].Value + ".xml");
 
     // standalone typedef: typedef ... Name;
     m = R.Typedef.Match(t);
-    if (m.Success) return (m.Groups[1].Value, m.Groups[1].Value + ".xml");
+    if (m.Success) return (new[] { m.Groups[1].Value }, m.Groups[1].Value + ".xml");
 
-    return (null, null);
+    return (Array.Empty<string>(), null);
 }
 
 // ---- Main parsing ----
@@ -298,19 +312,32 @@ foreach (var hf in headerFiles)
             continue;
         }
         // Also handle typedef struct|union Name when { is on the next line
-        if (contextType == "" || contextName == "")
+        // Always matches (no guard condition) because a forward declaration like
+        // "typedef struct b3DebugShape b3DebugShape;" sets context earlier and the
+        // guard would prevent the real definition from overriding it.
+        ctxMatch = R.TypedefStructType.Match(trimmed);
+        if (ctxMatch.Success)
         {
-            ctxMatch = R.TypedefStructType.Match(trimmed);
-            if (ctxMatch.Success)
+            var typeName = ctxMatch.Groups[3].Value;
+            if (!string.IsNullOrEmpty(typeName))
             {
-                var typeName = ctxMatch.Groups[3].Value;
-                if (!string.IsNullOrEmpty(typeName))
-                {
-                    contextType = "struct";
-                    contextName = typeName;
-                    i++;
-                    continue;
-                }
+                contextType = "struct";
+                contextName = typeName;
+                i++;
+                continue;
+            }
+        }
+        // Also handle typedef enum Name when { is on the next line
+        ctxMatch = R.TypedefEnumType.Match(trimmed);
+        if (ctxMatch.Success)
+        {
+            var typeName = ctxMatch.Groups[2].Value;
+            if (!string.IsNullOrEmpty(typeName))
+            {
+                contextType = "enum";
+                contextName = typeName;
+                i++;
+                continue;
             }
         }
         ctxMatch = R.EnumOpen.Match(trimmed);
@@ -368,18 +395,53 @@ foreach (var hf in headerFiles)
 
             if (!string.IsNullOrEmpty(declLine))
             {
-                var (memberName, xmlFile) = GetMemberName(declLine, contextType, contextName);
-                if (memberName != null && xmlFile != null)
+                var (memberNames, xmlFile) = GetMemberName(declLine, contextType, contextName);
+                if (memberNames.Length > 0 && xmlFile != null)
                 {
-                    var xml = BuildMemberXml(memberName, summary, paramBlock.Params, paramBlock.Returns);
-                    if (!members.ContainsKey(xmlFile)) members[xmlFile] = new List<string>();
-                    members[xmlFile].Add(xml);
-                    totalMembers++;
+                    foreach (var mname in memberNames)
+                    {
+                        var xml = BuildMemberXml(mname, summary, paramBlock.Params, paramBlock.Returns);
+                        if (!members.ContainsKey(xmlFile)) members[xmlFile] = new List<string>();
+                        members[xmlFile].Add(xml);
+                        totalMembers++;
+                    }
                 }
             }
         }
         else
         {
+            // Inside a struct/union, extract inline // comments as field documentation
+            if ((contextType == "struct" || contextType == "union") && !string.IsNullOrEmpty(contextName))
+            {
+                var fiMatch = R.StructField.Match(trimmed);
+                if (fiMatch.Success)
+                {
+                    // Check for inline ///< (Doxygen) or // comment on the original line
+                    int commentIdx = line.IndexOf("///<");
+                    int skipLen = 4; // "///<"
+                    if (commentIdx < 0)
+                    {
+                        commentIdx = line.IndexOf("//");
+                        skipLen = 2; // "//"
+                    }
+                    if (commentIdx >= 0)
+                    {
+                        var inlineComment = line.Substring(commentIdx + skipLen).Trim();
+
+                        var fieldNames = fiMatch.Groups[1].Value.Split(',')
+                            .Select(f => f.Trim()).Where(f => f.Length > 0).ToArray();
+                        foreach (var fname in fieldNames)
+                        {
+                            var mname = contextName + "." + fname;
+                            var xml = BuildMemberXml(mname, inlineComment, null, null);
+                            var xmlFile = contextName + ".xml";
+                            if (!members.ContainsKey(xmlFile)) members[xmlFile] = new List<string>();
+                            members[xmlFile].Add(xml);
+                            totalMembers++;
+                        }
+                    }
+                }
+            }
             i = saveI + 1;
         }
     }
@@ -493,12 +555,13 @@ static class R
 
     // GetMemberName
     internal static readonly Regex B3ApiFunc = new(@"^B3_API\s+.*?\b(\w+)\s*\(", RegexOptions.Compiled);
-    internal static readonly Regex StructField = new(@"^(\w+)\s*;", RegexOptions.Compiled);
+    internal static readonly Regex StructField = new(@"^.*?(\w+(?:\s*,\s*\w+)*)\s*;", RegexOptions.Compiled);
     internal static readonly Regex StructClose = new(@"^}\s*(\w+)\s*;", RegexOptions.Compiled);
     internal static readonly Regex EnumValEq = new(@"^(\w+)\s*=\s*\d+", RegexOptions.Compiled);
     internal static readonly Regex EnumVal = new(@"^(\w+)\s*,?", RegexOptions.Compiled);
     internal static readonly Regex FnPtrTypedef = new(@"typedef\s+.*?\(\*\s*(\w+)\)", RegexOptions.Compiled);
     internal static readonly Regex TypedefFuncPtr = new(@"^typedef\s+(?!struct|union)[^;]*?\b(\w+)\s*\(", RegexOptions.Compiled);
     internal static readonly Regex TypedefStructType = new(@"^(typedef\s+)?(struct|union)\s+(\w+)", RegexOptions.Compiled);
+    internal static readonly Regex TypedefEnumType = new(@"^(typedef\s+)?enum\s+(\w+)", RegexOptions.Compiled);
     internal static readonly Regex Typedef = new(@"^typedef\s+.*?\s+(\w+)\s*;", RegexOptions.Compiled);
 }
