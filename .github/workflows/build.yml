@@ -226,7 +226,7 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 11.x
-          dotnet-quality: daily # using function pointers in structs as return types will crash Mono! we need to use CoreCLR on mobile and mac catalyst
+          dotnet-quality: preview # using function pointers in structs as return types will crash Mono! we need to use CoreCLR on mobile and mac catalyst
       # Mobile workloads
       - name: Install Android workload
         if: contains(matrix.platform.name, 'android')
