@@ -6,6 +6,6 @@
     <Box3DClangDefines>-a;-D;-a;BOX3D_DOUBLE_PRECISION</Box3DClangDefines>
   </PropertyGroup>
 
-  <Import Project="../Box3D.targets" />
+  <Import Project="../Box3D.csproj" />
 
 </Project>
