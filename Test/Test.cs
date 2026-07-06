@@ -5,13 +5,6 @@
 using System;
 using Box3D;
 using static Box3D.Box3D;
-#if ANDROID
-using Android.App;
-using Android.Content;
-using Android.OS;
-using Android.Runtime;
-using System.Threading.Tasks;
-#endif
 
 // https://github.com/erincatto/box3d/blob/1bec63c9ee9b8a5bb54900f201c872585ee23260/test/test_world.c#L16-L101
 
@@ -114,13 +107,13 @@ static class Program
 }
 
 #if ANDROID
-[Activity(Label = "Box3D Test", MainLauncher = true)]
-public class MainActivity : Activity
+[Android.App.Activity(Label = "Box3D Test", MainLauncher = true)]
+public class MainActivity : Android.App.Activity
 {
-	protected override async void OnCreate(Bundle? savedInstanceState)
+	protected override async void OnCreate(Android.OS.Bundle? savedInstanceState)
 	{
 		base.OnCreate(savedInstanceState);
-		await Task.Delay(6000); // Wait for dotnet run to detect process ID
+		await System.Threading.Tasks.Task.Delay(6000); // Wait for dotnet run to detect process ID
 		Java.Lang.JavaSystem.Exit(Program.Main());
 	}
 }

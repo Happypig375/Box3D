@@ -8,6 +8,6 @@ public partial class Box3D
     {
         // For iOS and Mac Catalyst: load the native library from the framework bundle
         if (OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst())
-            NativeLibrary.Load("@rpath/box3d.framework/box3d");
+            NativeLibrary.SetDllImportResolver(typeof(Box3D).Assembly, (_, _, _) => NativeLibrary.Load("@rpath/box3d.framework/box3d"));
     }
 }
