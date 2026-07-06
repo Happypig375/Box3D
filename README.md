@@ -132,7 +132,7 @@ This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime wi
 
 ## Usage
 
-The C# API mirrors the Box3D C API one-to-one. All public types and functions live in the `Box3D` namespace under the `Box3D` partial class, so you can call them with `using static Box3D.Box3D;`:
+The C# API mirrors the Box3D C API one-to-one. All public types live in the `Box3D` namespace and all public functions live under the `Box3D` partial class, so you can call them with `using static Box3D.Box3D;`:
 
 ```csharp
 using Box3D;
@@ -165,15 +165,24 @@ Because Box3D is a C library, many functions take pointers to definition structs
 
 By default Box3D runs single-threaded. To enable multithreading, set `workerCount` and provide task callbacks on the world definition before creating the world:
 
+> [!TIP]
+> Box3D recommends using the **physical core count** (not counting hyper-threads or efficiency cores) as the worker count. The built-in scheduler creates `workerCount - 1` threads, counting the calling thread as the last worker.
+
 ```csharp
+// Physical core heuristic: divide logical processors by 2 (hyper-threading typically doubles logical count) used in Box3D C samples
+int workerCount = Math.Clamp(Environment.ProcessorCount / 2, 1, 8);
 b3WorldDef worldDef = b3DefaultWorldDef();
-worldDef.workerCount = 4;
+worldDef.workerCount = workerCount;
+// optionally connect your own task scheduler if you want more control
 // worldDef.enqueueTask = ...;
 // worldDef.finishTask  = ...;
 b3WorldId worldId = b3CreateWorld(&worldDef);
 ```
 
-See the [upstream documentation](box3d/docs/foundation.md) for details.
+See the [Foundations section of Box3D documentation](https://box2d.org/documentation3d/md_foundation.html) for details.
+
+> [!CAUTION]
+> When using multithreading, do not perform read or write operations on a Box3D world during `b3World_Step()`. Do not write to the Box3D world from multiple threads. Any operation that wakes a body is not thread-safe.
 
 ---
 
