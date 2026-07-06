@@ -265,7 +265,8 @@ Triggered on every push, this workflow builds the native Box3D shared library fo
 - **Linux** (x64, ARM64) — Ninja
 - **macOS** (ARM64) — Xcode
 - **Android** (ARM64, x64) — Android NDK
-- **iOS** (device, simulator, Mac Catalyst) — Xcode with framework packaging
+- **iOS** (ARM64 device, ARM64 simulator) — Xcode with framework packaging
+- **Mac Catalyst** (ARM64) — Clang with framework packaging
 
 Each platform's binary is uploaded as a build artifact and later assembled into the NuGet package's `runtimes/` folder.
 
@@ -300,9 +301,9 @@ git commit -m "Update box3d to <upstream commit>"
 
 ## License
 
-Box3D is developed by Erin Catto and (@erincatto) uses the [MIT License](https://github.com/erincatto/box3d/blob/main/LICENSE).
+Box3D is developed by Erin Catto ([@erincatto](https://github.com/erincatto)) and uses the [MIT License](https://github.com/erincatto/box3d/blob/main/LICENSE).
 
-The C# bindings in this repository are developed by @Happypig375 (Hadrian Tang) and also distributed under the [MIT License](LICENSE.md).
+The C# bindings in this repository are developed by Hadrian Tang ([@Happypig375](https://github.com/Happypig375)) and also distributed under the [MIT License](LICENSE.md).
 
 ---
 

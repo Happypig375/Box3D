@@ -227,8 +227,7 @@ jobs:
           - { name: osx-arm64,       os: macos-latest,     tfm: net10.0 }
           - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android, build-only: true } # Didn't find a way to run this on CI without hanging
           - { name: android-x64,     os: ubuntu-latest,    tfm: net11.0-android }
-          - { name: ios-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios, build-only: true } # Running requires a real device
-          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios }
+          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios } # Building for ios-arm64 requires a real device so it's omitted
           - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net11.0-maccatalyst }
     steps:
       - uses: actions/checkout@v7
@@ -313,16 +312,16 @@ jobs:
           path: ./artifacts
 
       - name: Validate build
-        if: matrix.platform.build-only == true
+        if: matrix.platform.build-only
         run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }}
 
       # For Android: start emulator and run validation inside its script parameter
       - name: Enable KVM # Soeeds up emulator startup time from 15 minutes to 2.5 minutes
-        if: matrix.platform.build-only != true && contains(matrix.platform.name, 'android')
+        if: "!matrix.platform.build-only && contains(matrix.platform.name, 'android')"
         run: |
           sudo chown $USER /dev/kvm || echo "KVM not accessible"
       - name: Validate on Android emulator
-        if: matrix.platform.build-only != true && contains(matrix.platform.name, 'android')
+        if: "!matrix.platform.build-only && contains(matrix.platform.name, 'android')"
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35 # must at least be 35. see https://github.com/ReactiveCircus/android-emulator-runner/issues/458
@@ -337,7 +336,7 @@ jobs:
           
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
-        if: matrix.platform.build-only != true && !contains(matrix.platform.name, 'android')
+        if: "!matrix.platform.build-only && !contains(matrix.platform.name, 'android')"
         shell: bash
         run: |
           cd Test
