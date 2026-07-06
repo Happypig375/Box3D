@@ -48,16 +48,16 @@
   <!-- Native binaries for NuGet package (download from GitHub Actions) -->
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)Box2D.png;$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)win-x64\box3d.dll" Pack="true" PackagePath="runtimes/win-x64/native/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)win-arm64\box3d.dll" Pack="true" PackagePath="runtimes/win-arm64/native/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)linux-x64\libbox3d.so" Pack="true" PackagePath="runtimes/linux-x64/native/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)linux-arm64\libbox3d.so" Pack="true" PackagePath="runtimes/linux-arm64/native/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)osx-arm64\libbox3d.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)ios-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/ios-arm64/native/box3d.framework" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)iossimulator-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/iossimulator-arm64/native/box3d.framework" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)maccatalyst-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/maccatalyst-arm64/native/box3d.framework" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)android\arm64-v8a\libbox3d.so" Pack="true" PackagePath="runtimes/android-arm64/native/" />
-    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)android\x86_64\libbox3d.so" Pack="true" PackagePath="runtimes/android-x64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)win-x64\box3d.dll" Pack="true" PackagePath="runtimes/win-x64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)win-arm64\box3d.dll" Pack="true" PackagePath="runtimes/win-arm64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)linux-x64\libbox3d.so" Pack="true" PackagePath="runtimes/linux-x64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)linux-arm64\libbox3d.so" Pack="true" PackagePath="runtimes/linux-arm64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)osx-arm64\libbox3d.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)ios-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/ios-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)iossimulator-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/iossimulator-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)maccatalyst-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/maccatalyst-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)android\arm64-v8a\libbox3d.so" Pack="true" PackagePath="runtimes/android-arm64/native/" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)android\x86_64\libbox3d.so" Pack="true" PackagePath="runtimes/android-x64/native/" />
   </ItemGroup>
 
   <!-- Stage all headers to obj/ (never modify submodule), preprocessing math_functions.h -->
