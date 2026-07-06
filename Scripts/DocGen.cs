@@ -71,7 +71,7 @@ string BuildMemberXml(string name, string? summary, List<(string name, string de
         var cleaned = CleanDoxygen(summary);
         if (!string.IsNullOrEmpty(cleaned))
         {
-            sb.AppendLine($"    <summary>{cleaned}</summary>");
+            sb.AppendLine($"    <summary>{EscapeXml(cleaned)}</summary>");
         }
     }
     if (parms != null)
@@ -80,13 +80,13 @@ string BuildMemberXml(string name, string? summary, List<(string name, string de
         {
             var pn = EscapeXml(p.name);
             var pd = CleanDoxygen(p.desc);
-            sb.AppendLine($"    <param name=\"{pn}\">{pd}</param>");
+            sb.AppendLine($"    <param name=\"{pn}\">{EscapeXml(pd)}</param>");
         }
     }
     if (!string.IsNullOrEmpty(returns))
     {
         var r = CleanDoxygen(returns);
-        sb.AppendLine($"    <returns>{r}</returns>");
+        sb.AppendLine($"    <returns>{EscapeXml(r)}</returns>");
     }
     sb.AppendLine("  </member>");
     return sb.ToString();
