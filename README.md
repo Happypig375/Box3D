@@ -44,18 +44,17 @@ Box3D is a feature-complete 3D physics engine. Highlights include:
 
 ## Quick Start
 
-Install the [NuGet package](https://www.nuget.org/packages/Box3D):
-
-```bash
-dotnet add package Box3D
-```
-
-Then simulate a box falling onto a ground plane:
+Save the following simulation of a box falling onto a ground plane to a C# file (e.g. `Box3D.cs`):
 
 ```csharp
+// For projects, run: dotnet add package Box3D
+#:package Box3D@*
+// For projects, add to PropertyGroup in csproj: <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+#:property AllowUnsafeBlocks=true
 using Box3D;
 using static Box3D.Box3D;
 using System;
+unsafe {
 
 // Create a world with gravity pointing down (-Y).
 b3WorldDef worldDef = b3DefaultWorldDef();
@@ -95,9 +94,10 @@ for (int i = 0; i < 90; ++i)
 }
 
 b3DestroyWorld(worldId);
+}
 ```
 
-The box falls from `y = 4` and comes to rest at approximately `y = 1` (sitting on the ground surface at `y = 0`).
+After running this file (e.g. `dotnet Box3D.cs`), the results show that the box falls from `y = 4` and comes to rest at approximately `y = 1` (sitting on the ground surface at `y = 0`).
 
 > [!TIP]
 > Box3D is tuned for **meters, kilograms, seconds**. Keep moving objects between 0.1 m and 10 m for best results. Refer to [Box3D documentation](https://box2d.org/documentation3d) for guidance on units and world size.
