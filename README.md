@@ -1,6 +1,6 @@
-<p align="center"><image src="Box2D.png"/><h1 p align="center">Box3D</h1>
+<p align="center"><image src="Box2D.png"/><h1 align="center">Box3D</h1></p>
 
-**C# bindings for [Box3D](https://github.com/erincatto/box3d)** — Erin Catto's 3D rigid body physics engine for games.</p>
+<p align="center"><b>C# bindings for <a href="https://github.com/erincatto/box3d">Box3D</a></b> — Erin Catto's 3D rigid body physics engine for games.</p>
 
 [![NuGet](https://img.shields.io/nuget/v/Box3D.svg)](https://www.nuget.org/packages/Box3D)
 [![Build Status](https://github.com/Happypig375/Box3D/actions/workflows/build.yml/badge.svg)](https://github.com/Happypig375/Box3D/actions/workflows/build.yml)
@@ -9,7 +9,7 @@
 This package provides .NET bindings and prebuilt native binaries for the Box3D C library, so you can use a high-performance 3D physics engine from C# without compiling any C code yourself. The native libraries are built for **10 platforms** and packaged in a single NuGet package that works out of the box on desktop, mobile, and web.
 
 > [!IMPORTANT]
-> This is the C# wrapper repository. The physics engine itself is developed by Erin Catto at [erincatto/box3d](https://github.com/erincatto/box3d) and is included here as a git submodule. For physics documentation, tutorials, and the C API reference, see the [upstream docs](#documentation).
+> This is the C# wrapper repository. The physics engine itself is developed by Erin Catto at [erincatto/box3d](https://github.com/erincatto/box3d) and is included here as a git submodule. For physics documentation, tutorials, and the C API reference, refer to [Box3D documentation](https://box2d.org/documentation3d).
 
 ---
 
@@ -100,7 +100,7 @@ b3DestroyWorld(worldId);
 The box falls from `y = 4` and comes to rest at approximately `y = 1` (sitting on the ground surface at `y = 0`).
 
 > [!TIP]
-> Box3D is tuned for **meters, kilograms, seconds**. Keep moving objects between 0.1 m and 10 m for best results. See the [upstream overview](box3d/docs/overview.md) for guidance on units and world size.
+> Box3D is tuned for **meters, kilograms, seconds**. Keep moving objects between 0.1 m and 10 m for best results. Refer to [Box3D documentation](https://box2d.org/documentation3d) for guidance on units and world size.
 
 ---
 
@@ -177,9 +177,9 @@ See the [upstream documentation](box3d/docs/foundation.md) for details.
 ### Prerequisites
 
 - [git](https://git-scm.com/) — for cloning with submodules
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) — to build the C# bindings and NuGet package
-- [CMake](https://cmake.org/) 3.22+ — only needed if you want to rebuild the native libraries
-- A C17 compiler (MSVC, Clang, or GCC) — only needed for native builds
+- [.NET SDK](https://dotnet.microsoft.com/download) — to build the C# bindings and NuGet package
+- [CMake](https://cmake.org/) — only needed if you want to rebuild the native libraries
+- A C compiler (MSVC, Clang, or GCC) — only needed for native builds
 
 ### Clone with the submodule
 
@@ -249,7 +249,7 @@ PreprocessHeaders  →  GenerateNativeBindings  →  PostProcessNativeMethods  �
 | Post-process | `Scripts/PostProcessNativeMethods.cs` | Remaps C math functions to `System.MathF`, fixes boolean comparisons, deduplicates declarations |
 | Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` for IntelliSense |
 
-The package version is derived automatically from the submodule's `CMakeLists.txt` (currently `0.1.0`) with a date-based revision suffix, so it always reflects the upstream version you're binding against.
+The package version is derived automatically from the submodule's `CMakeLists.txt` with a date-based revision suffix, so it always reflects the upstream version you're binding against.
 
 ---
 
@@ -279,53 +279,11 @@ Runs daily at 06:00 UTC to check for new commits in the upstream `erincatto/box3
 
 This ensures the C# bindings track the latest Box3D release without manual intervention.
 
----
-
-## Documentation
-
-The full Box3D user manual and API reference live in the submodule at [`box3d/docs/`](box3d/docs/). Key documents:
-
-| Document | Contents |
-|---|---|
-| [Overview](box3d/docs/overview.md) | Core concepts: bodies, shapes, constraints, joints, solver, CCD, events |
-| [Hello World](box3d/docs/hello.md) | Minimal first program (C tutorial) |
-| [Foundations](box3d/docs/foundation.md) | Assertions, allocators, vector math (`b3Vec3`, `b3Quat`, `b3Matrix3`) |
-| [Collision](box3d/docs/collision.md) | Shape primitives, convex hulls, meshes, dynamic tree |
-| [Simulation](box3d/docs/simulation.md) | Worlds, bodies, shapes, contacts, joints, events |
-| [Samples](box3d/docs/samples.md) | The samples application (sokol + imgui) |
-| [Character](box3d/docs/character.md) | Character mover usage |
-| [Large Worlds](box3d/docs/large_worlds.md) | Double precision and large coordinate support |
-| [Recording](box3d/docs/recording.md) | Simulation recording and replay |
-| [FAQ](box3d/docs/faq.md) | Frequently asked questions |
-
-The C# API is a direct translation of the C API, so the C documentation applies directly — just use the C# syntax shown in the [Quick Start](#quick-start) and [Usage](#usage) sections above.
-
-XML documentation (IntelliSense) is generated from the C header comments and packaged as `Box3D.xml`, so you get inline API documentation in your editor.
-
----
-
-## Samples
-
-The upstream Box3D repository includes a samples application written in C++ using [sokol](https://github.com/floooh/sokol) for graphics and [imgui](https://github.com/ocornut/imgui) for the UI. It runs with D3D11 on Windows, Metal on macOS, and OpenGL 4.5 on Linux.
-
-To build and run the samples (requires a C++20 compiler):
-
-```bash
-cd box3d
-cmake --preset windows          # or: linux-release / macos
-cmake --build --preset windows-release
-./build/bin/Release/samples     # Windows: .\build\bin\Release\samples.exe
-```
-
-See [`box3d/docs/samples.md`](box3d/docs/samples.md) for details.
-
----
-
 ## Contributing
 
-This repository wraps the upstream Box3D engine. Bug reports and feature requests related to the **C# bindings or NuGet packaging** should be filed at [Happypig375/Box3D/issues](https://github.com/Happypig375/Box3D/issues).
+This repository wraps the upstream Box3D engine. Bug reports and feature requests related to the **C# bindings or NuGet packaging** should be filed at [Happypig375/Box3D issues](https://github.com/Happypig375/Box3D/issues).
 
-Issues related to the **physics engine itself** (collision, solver, joints, etc.) should be filed upstream at [erincatto/box3d/issues](https://github.com/erincatto/box3d/issues).
+Issues related to the **physics engine itself** (collision, solver, joints, etc.) should be filed upstream at [erincatto/box3d issues](https://github.com/erincatto/box3d/issues).
 
 ### Submodule update workflow
 
@@ -342,9 +300,9 @@ git commit -m "Update box3d to <upstream commit>"
 
 ## License
 
-Box3D is developed by Erin Catto and uses the [MIT License](https://en.wikipedia.org/wiki/MIT_License).
+Box3D is developed by Erin Catto and (@erincatto) uses the [MIT License](https://github.com/erincatto/box3d/blob/main/LICENSE).
 
-The C# bindings in this repository are Copyright © 2026 Hadrian Tang and also distributed under the [MIT License](LICENSE.md).
+The C# bindings in this repository are developed by @Happypig375 (Hadrian Tang) and also distributed under the [MIT License](LICENSE.md).
 
 ---
 

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- required by mobile -->
-    <ApplicationId>org.box2d.Box3D</ApplicationId>
+    <ApplicationId>com.github.Happypig375.Box3D</ApplicationId>
   </PropertyGroup>
 
   <ItemGroup>
