@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Overrides for the shared binding-generation pipeline -->
+  <PropertyGroup>
+    <Box3DNativeSubdirectory>large-worlds/</Box3DNativeSubdirectory>
+    <Box3DClangDefines>-a;-D;-a;BOX3D_DOUBLE_PRECISION</Box3DClangDefines>
+  </PropertyGroup>
+
+  <Import Project="../Box3D.targets" />
+
+</Project>

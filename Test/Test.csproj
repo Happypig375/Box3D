@@ -7,9 +7,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- required by mobile -->
     <ApplicationId>com.github.Happypig375.Box3D</ApplicationId>
+    <DefineConstants Condition="'$(LargeWorlds)' == 'true'">$(DefineConstants);LARGEWORLDS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Box3D" Version="*" />
+    <PackageReference Include="Box3D" Version="*" Condition="'$(LargeWorlds)' != 'true'" />
+    <PackageReference Include="Box3D.LargeWorlds" Version="*" Condition="'$(LargeWorlds)' == 'true'" />
   </ItemGroup>
 </Project>

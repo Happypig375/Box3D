@@ -17,6 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        precision: [single, double]
         platform:
           - { name: win-x64,       os: windows-latest,   flags: -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded }
           - { name: win-arm64,     os: windows-latest,   flags: -A ARM64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded }
@@ -25,7 +26,10 @@ jobs:
           - { name: osx-arm64,     os: macos-latest,     flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 }
           - { name: android-arm64, os: ubuntu-latest,     flags: -GNinja, abi: arm64-v8a }
           - { name: android-x64,   os: ubuntu-latest,     flags: -GNinja, abi: x86_64 }
-    name: Build ${{ matrix.platform.name }}
+          - { name: ios-arm64,          os: macos-latest }
+          - { name: iossimulator-arm64, os: macos-latest }
+          - { name: maccatalyst-arm64,  os: macos-latest }
+    name: Build ${{ matrix.precision }} ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
     steps:
       - uses: actions/checkout@v7
@@ -53,6 +57,7 @@ jobs:
           NAME: ${{ matrix.platform.name }}
           RUNNER_OS: ${{ runner.os }}
           FLAGS: ${{ matrix.platform.flags }}
+          PRECISION: ${{ matrix.precision }}
           ANDROID_ABI: ${{ matrix.platform.abi }}
           BUILD_TYPE: ${{ env.BUILD_TYPE }}
           ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
@@ -60,120 +65,29 @@ jobs:
         run: ./build-native.sh
 
       - name: Compress native directory
-        run: tar -cvf native-${{ matrix.platform.name }}.tar native/${{ case(!contains(matrix.platform.name, 'android'), matrix.platform.name, format('android/{0}', matrix.platform.abi)) }}
+        run: |
+          if [[ "${{ matrix.precision }}" == "double" ]]; then
+            SRC_PREFIX="large-worlds/"
+          else
+            SRC_PREFIX=""
+          fi
+          tar -cvf native-${{ matrix.precision }}-${{ matrix.platform.name }}.tar native/${SRC_PREFIX}${{ case(!contains(matrix.platform.name, 'android'), matrix.platform.name, format('android/{0}', matrix.platform.abi)) }}
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v7
         with:
-          name: native-${{ matrix.platform.name }}
-          path: native-${{ matrix.platform.name }}.tar
-          archive: false # don't put in zip, just upload the tar file
-          if-no-files-found: error
-
-  build-ios:
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - { name: ios-arm64 }
-          - { name: iossimulator-arm64 }
-          - { name: maccatalyst-arm64 }
-    name: Build ${{ matrix.platform.name }}
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Build
-        run: |
-          if [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            # Mac Catalyst: use Unix Makefiles with an explicit target triple
-            # (arm64-apple-ios15.0-macabi). The Xcode generator always produces
-            # iOS binaries regardless of xcodebuild overrides.
-            SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-            cmake -S box3d -B build-${{ matrix.platform.name }} \
-              -G "Unix Makefiles" \
-              -DCMAKE_C_COMPILER=clang \
-              -DCMAKE_CXX_COMPILER=clang++ \
-              -DCMAKE_OSX_SYSROOT="$SDKROOT" \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-              -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
-              -DCMAKE_C_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DCMAKE_CXX_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi -Wl,-install_name,@rpath/box3d.framework/box3d" \
-              -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
-              -DBUILD_SHARED_LIBS=ON \
-              -DBOX3D_SAMPLES=OFF \
-              -DBOX3D_UNIT_TESTS=OFF \
-              -DBOX3D_VALIDATE=OFF
-            cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE
-          else
-            cmake -S box3d -B build-${{ matrix.platform.name }} \
-              -GXcode \
-              -DCMAKE_SYSTEM_NAME=iOS \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 \
-              -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-              ${{ case(matrix.platform.name == 'iossimulator-arm64', '-DCMAKE_OSX_SYSROOT=iphonesimulator', '') }} \
-              -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-install_name,@rpath/box3d.framework/box3d \
-              -DBUILD_SHARED_LIBS=ON \
-              -DBOX3D_SAMPLES=OFF \
-              -DBOX3D_UNIT_TESTS=OFF \
-              -DBOX3D_VALIDATE=OFF
-            cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE -- CODE_SIGNING_ALLOWED=NO
-          fi
-
-      - name: Create framework
-        run: |
-          framework_dir="native/${{ matrix.platform.name }}/box3d.framework"
-          mkdir -p "$framework_dir"
-          if [ -f "build-${{ matrix.platform.name }}/bin/$BUILD_TYPE/libbox3d.dylib" ]; then
-            cp "build-${{ matrix.platform.name }}/bin/$BUILD_TYPE/libbox3d.dylib" "$framework_dir/box3d"
-          else
-            cp "build-${{ matrix.platform.name }}/bin/libbox3d.dylib" "$framework_dir/box3d"
-          fi
-          cat > "$framework_dir/Info.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleDevelopmentRegion</key>
-            <string>en</string>
-            <key>CFBundleExecutable</key>
-            <string>box3d</string>
-            <key>CFBundleIdentifier</key>
-            <string>org.box2d.Box3D</string>
-            <key>CFBundleInfoDictionaryVersion</key>
-            <string>6.0</string>
-            <key>CFBundleName</key>
-            <string>box3d</string>
-            <key>CFBundlePackageType</key>
-            <string>FMWK</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>MinimumOSVersion</key>
-            <string>15.0</string>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Compress native directory
-        run: tar -cvf native-${{ matrix.platform.name }}.tar native/${{ matrix.platform.name }}
-
-      - name: Upload native artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: native-${{ matrix.platform.name }}.tar
+          name: native-${{ matrix.precision }}-${{ matrix.platform.name }}
+          path: native-${{ matrix.precision }}-${{ matrix.platform.name }}.tar
           archive: false # don't put in zip, just upload the tar file
           if-no-files-found: error
 
   pack-nuget:
-    name: Pack NuGet package
+    name: Pack ${{ matrix.precision == 'double' && 'Box3D.LargeWorlds' || 'Box3D' }} NuGet package
     runs-on: ubuntu-latest
-    needs: [ build, build-ios ]
+    needs: build
+    strategy:
+      matrix:
+        precision: [single, double]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -181,45 +95,44 @@ jobs:
       - name: Download native artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: native-*.tar
+          pattern: native-${{ matrix.precision }}-*.tar
           merge-multiple: true
-
       - name: Decompress native artifacts
         run: |
-          for file in native-*.tar
-          do
+          for file in native-${{ matrix.precision }}-*.tar; do
             tar -xf "$file"
           done
-          rm native-*.tar
-
+          rm native-${{ matrix.precision }}-*.tar
       - name: Set up .NET and Clang
         uses: ./.github/actions/setup-dotnet-clang
-
       - name: Pack NuGet package
         shell: bash
-        run: dotnet pack -c $BUILD_TYPE -o ./artifacts
-    
+        run: |
+          if [[ "${{ matrix.precision }}" == "double" ]]; then
+            dotnet pack Box3D.LargeWorlds/Box3D.LargeWorlds.csproj -c $BUILD_TYPE -o ./artifacts
+          else
+            dotnet pack -c $BUILD_TYPE -o ./artifacts
+          fi
       - name: Upload NuGet package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: nuget-package
+          name: nuget-${{ matrix.precision }}-package
           path: ./artifacts
-          archive: false # don't put in zip, just upload the nupkg file
+          archive: false # don't put in zip, just upload the nupkg files
           if-no-files-found: error
-
       - name: Validate XML documentation coverage
         shell: bash
         run: cd Scripts && dotnet run DocCoverage.cs
 
   validate:
-    name: Validate NuGet package on ${{ matrix.platform.name }}
+    name: Validate ${{ matrix.precision == 'double' && 'Box3D.LargeWorlds' || 'Box3D' }} on ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
     needs: pack-nuget
     strategy:
       fail-fast: false
       matrix:
+        precision: [single, double]
         platform:
-          # Host platforms — run as net10.0 console app
           - { name: win-x64,         os: windows-latest,   tfm: net10.0 }
           - { name: win-arm64,       os: *windows-latest-arm,   tfm: net10.0 }
           - { name: linux-x64,       os: ubuntu-latest,    tfm: net10.0 }
@@ -231,11 +144,15 @@ jobs:
           - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net11.0-maccatalyst }
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 11.x
-          dotnet-quality: preview # using function pointers in structs as return types will crash Mono! we need to use CoreCLR on mobile and mac catalyst
+          dotnet-quality: preview # needed for net11.0
+
       # Mobile workloads
       - name: Install Android workload
         if: contains(matrix.platform.name, 'android')
@@ -247,7 +164,7 @@ jobs:
         if: contains(matrix.platform.name, 'maccatalyst')
         run: dotnet workload install maccatalyst
 
-      # Android SDK (only needed for Android validation)
+      # Android SDK
       - name: Setup JDK
         if: contains(matrix.platform.name, 'android')
         uses: actions/setup-java@v5
@@ -304,19 +221,30 @@ jobs:
         with:
           xcode-version: ${{ steps.ios-version.outputs.xcode-version }}
 
+      # For double precision on Linux: Clang headers for binding generation
+      - name: Set up Clang (.so resolution and headers)
+        if: matrix.precision == 'double' && runner.os == 'Linux'
+        uses: ./.github/actions/setup-dotnet-clang
+
+      # Build LargeWorlds project to validate the full binding pipeline
+      - name: Build Box3D.LargeWorlds project
+        if: matrix.precision == 'double'
+        shell: bash
+        run: dotnet build Box3D.LargeWorlds/Box3D.LargeWorlds.csproj -c $BUILD_TYPE
+
       - name: Download NuGet package
         uses: actions/download-artifact@v8
         with:
-          pattern: '*.nupkg'
+          pattern: nuget-${{ matrix.precision }}-package
           merge-multiple: true
           path: ./artifacts
 
       - name: Validate build
         if: matrix.platform.build-only
-        run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }}
+        run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} -p:Box3DPackageId=${{ matrix.precision == 'double' && 'Box3D.LargeWorlds' || 'Box3D' }}
 
       # For Android: start emulator and run validation inside its script parameter
-      - name: Enable KVM # Soeeds up emulator startup time from 15 minutes to 2.5 minutes
+      - name: Enable KVM # Speeds up emulator startup time from 15 minutes to 2.5 minutes
         if: "!matrix.platform.build-only && contains(matrix.platform.name, 'android')"
         run: |
           sudo chown $USER /dev/kvm || echo "KVM not accessible"
@@ -332,23 +260,26 @@ jobs:
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           working-directory: Test # Don't do cd in script as it's executed in a new bash every line
-          script: dotnet run -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}"
-          
+          script: >-
+            dotnet run
+            -p TargetFrameworks="${{ matrix.platform.tfm }}"
+            -r "${{ matrix.platform.name }}"
+            -p:Box3DPackageId=${{ matrix.precision == 'double' && 'Box3D.LargeWorlds' || 'Box3D' }}
+
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
         if: "!matrix.platform.build-only && !contains(matrix.platform.name, 'android')"
         shell: bash
+        env:
+          BOX3D_PKGID: ${{ matrix.precision == 'double' && 'Box3D.LargeWorlds' || 'Box3D' }}
         run: |
           cd Test
           if [[ "${{ matrix.platform.name }}" == "iossimulator-arm64" ]]; then
             UDID=$(xcrun simctl list devices | awk '/-- iOS ${{ steps.ios-version.outputs.xcode-version }} --/{flag=1;next}/--/{flag=0}flag' | grep -m1 -oE '[0-9A-F-]{36}')
-            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID -p SupportedOSPlatformVersion=26.0 # SupportedOSPlatformVersion is a work around for https://github.com/dotnet/macios/pull/25931 - remove when .NET 11 releases
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID -p SupportedOSPlatformVersion=26.0 -p:Box3DPackageId=$BOX3D_PKGID
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            # If we use dotnet run, there will be a launch error
-            # (no GUI session on CI), so find and run the executable directly.
-            dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }}
+            dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -p:Box3DPackageId=$BOX3D_PKGID
             echo "=== Searching for .app bundle ==="
-            # Prefer bin/ path over obj/ (codesign staging copy has no executable)
             APP_DIR=$(find /Users -path "*/bin/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
             if [ -z "$APP_DIR" ]; then
               APP_DIR=$(find /Users -name "Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
@@ -374,7 +305,7 @@ jobs:
               exit 1
             fi
           else
-            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }}
+            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} -p:Box3DPackageId=$BOX3D_PKGID
           fi
 
   nuget-push:

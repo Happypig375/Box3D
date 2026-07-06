@@ -1,0 +1,125 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet">
+    <Authors>Erin Catto, Hadrian Tang</Authors>
+    <Copyright>Copyright (c) 2026 Erin Catto, Hadrian Tang</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>Box2D.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/Happypig375/Box3D</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Happypig375/Box3D</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <Target Name="DerivePackageVersionAndReleaseNotes" BeforeTargets="BeforeBuild">
+    <!-- Extract the 3-part version from the submodule's CMakeLists.txt -->
+    <Exec Command="powershell -NoLogo -NoProfile -Command &quot;&amp; { (Select-String -Path '$(MSBuildThisFileDirectory)box3d\CMakeLists.txt' -Pattern 'VERSION (\d+\.\d+\.\d+)').Matches.Groups[1].Value }&quot;"
+          ConsoleToMSBuild="true"
+          Condition="$([System.OperatingSystem]::IsWindows())">
+      <Output TaskParameter="ConsoleOutput" PropertyName="Version" />
+    </Exec>
+    <!-- On non-Windows, use grep -->
+    <Exec Command="grep -oP 'VERSION \K\d+\.\d+\.\d+' '$(MSBuildThisFileDirectory)box3d/CMakeLists.txt'"
+          ConsoleToMSBuild="true"
+          Condition="!$([System.OperatingSystem]::IsWindows())">
+      <Output TaskParameter="ConsoleOutput" PropertyName="Version" />
+    </Exec>
+    <PropertyGroup>
+      <!-- Set <Version> to just the submodule version (revision must be <= 65535) -->
+      <!-- NuGet package version also uses date as the 4th part -->
+      <PackageVersion>$(Version).$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</PackageVersion>
+    </PropertyGroup>
+
+    <!-- Derive PackageReleaseNotes from the last git commit message -->
+    <Exec Command="git log -1 --format=%s"
+          ConsoleToMSBuild="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="PackageReleaseNotes" />
+    </Exec>
+  </Target>
+
+  <!-- Native binaries for NuGet package (download from GitHub Actions) -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)Box2D.png;$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)win-x64\box3d.dll" Pack="true" PackagePath="runtimes/win-x64/native/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)win-arm64\box3d.dll" Pack="true" PackagePath="runtimes/win-arm64/native/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)linux-x64\libbox3d.so" Pack="true" PackagePath="runtimes/linux-x64/native/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)linux-arm64\libbox3d.so" Pack="true" PackagePath="runtimes/linux-arm64/native/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)osx-arm64\libbox3d.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)ios-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/ios-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)iossimulator-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/iossimulator-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)maccatalyst-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/maccatalyst-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)android\arm64-v8a\libbox3d.so" Pack="true" PackagePath="runtimes/android-arm64/native/" />
+    <None Include="$(MSBuildProjectDirectory)native\$(Box3DNativeSubdirectory)android\x86_64\libbox3d.so" Pack="true" PackagePath="runtimes/android-x64/native/" />
+  </ItemGroup>
+
+  <!-- Stage all headers to obj/ (never modify submodule), preprocessing math_functions.h -->
+  <Target Name="PreprocessHeaders"
+          BeforeTargets="GenerateNativeBindings"
+          Inputs="$(MSBuildThisFileDirectory)box3d/include/box3d/*.h"
+          Outputs="$(IntermediateOutputPath)headers/*.h">
+    <Exec Command="dotnet run StageHeaders.cs -- &quot;$(MSBuildThisFileDirectory)box3d/include/box3d&quot; &quot;$(MSBuildProjectDirectory)\$(IntermediateOutputPath)headers&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)Scripts" />
+  </Target>
+
+  <!-- Auto-generate native bindings when headers change -->
+  <Target Name="GenerateNativeBindings"
+          BeforeTargets="PostProcessNativeMethods"
+          DependsOnTargets="PreprocessHeaders">
+    <!-- Restore the local tool (ClangSharpPInvokeGenerator) -->
+    <Exec Command="dotnet tool restore --tool-manifest &quot;$(MSBuildThisFileDirectory)dotnet-tools.json&quot;" />
+
+    <ItemGroup>
+      <CHeader Include="$(IntermediateOutputPath)headers/*.h" />
+    </ItemGroup>
+
+    <!-- Build the ClangSharp response file lines -->
+    <ItemGroup>
+      <_RspCsLines Include="-f;%(CHeader.Identity)" />
+      <_RspCsLines Include="-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c" />
+      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes" />
+      <!-- Precision-specific defines from Box3D.LargeWorlds -->
+      <_RspCsLines Include="$(Box3DClangDefines)" Condition="'$(Box3DClangDefines)' != ''" />
+      <!--
+        On Unix systems, the NuGet's libclang.so lacks its resource directory (built-in headers
+        like <stdbool.h>, <stdint.h>). The CI workflow installs system clang headers and
+        sets CLANG_RESOURCE_DIR to the installed resource root. Pass it as -resource-dir.
+      -->
+      <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
+                   Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
+                      Lines="@(_RspCsLines)"
+                      Overwrite="true" />
+    <Exec Command="dotnet ClangSharpPInvokeGenerator @$(IntermediateOutputPath)generate_cs.rsp" />
+    <ItemGroup>
+      <Compile Include="NativeMethods.cs" />
+      <Compile Include="$(MSBuildThisFileDirectory)NativeTypeNameAttribute.cs" />
+      <Compile Include="$(MSBuildThisFileDirectory)iOSWorkaround.cs" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Post-process NativeMethods.cs to fix math functions and bool comparisons -->
+  <Target Name="PostProcessNativeMethods"
+          BeforeTargets="GenerateNativeBindingsDocumentation"
+          DependsOnTargets="GenerateNativeBindings">
+    <Exec Command="dotnet run PostProcessNativeMethods.cs -- &quot;$(MSBuildProjectDirectory)/NativeMethods.cs&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)Scripts" />
+  </Target>
+
+  <!-- Generate XML documentation from Doxygen comments in the C headers -->
+  <Target Name="GenerateNativeBindingsDocumentation"
+          BeforeTargets="BeforeBuild"
+          Inputs="$(MSBuildThisFileDirectory)box3d/include/box3d/*.h;NativeMethods.cs"
+          Outputs="$(Box3DClangNamespace).xml">
+    <Exec Command="dotnet run DocGen.cs -- &quot;$(MSBuildProjectDirectory)/NativeMethods.cs&quot; &quot;$(MSBuildProjectDirectory)/$(Box3DClangNamespace).xml&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)Scripts" />
+  </Target>
+
+</Project>

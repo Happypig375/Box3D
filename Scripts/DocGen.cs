@@ -3,10 +3,14 @@
 using System.Text;
 using System.Text.RegularExpressions;
 
+// Command-line arguments (optional):
+//   args[0] = path to NativeMethods.cs (default: "../NativeMethods.cs")
+//   args[1] = path to output .xml file   (default: "../Box3D.xml")
+var nativeMethodsFile = args.Length > 0 ? args[0] : "../NativeMethods.cs";
+var outputFile = args.Length > 1 ? args[1] : "../Box3D.xml";
+
 var headersDir = "../box3d/include/box3d";
-var outputDir = "..";
-var nativeMethodsFile = "../NativeMethods.cs";
-var outputFile = "Box3D.xml";
+var outputDir = Path.GetDirectoryName(Path.GetFullPath(outputFile)) ?? ".";
 
 var members = new Dictionary<string, List<string>>();
 
@@ -477,7 +481,7 @@ foreach (var hf in headerFiles)
             if (!existingMemberNames.Contains(memberName))
             {
                 var xml = BuildMemberXml(memberName, null, null, null);
-                string xmlFile = "Box3D.xml";
+                string xmlFile = Path.GetFileName(outputFile);
                 if (!members.ContainsKey(xmlFile)) members[xmlFile] = new List<string>();
                 members[xmlFile].Add(xml);
                 existingMemberNames.Add(memberName);
