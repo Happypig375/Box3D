@@ -11,7 +11,7 @@
 #   NAME       - platform name (e.g. win-x64, linux-arm64, ios-arm64)
 #   RUNNER_OS  - Windows / Linux / macOS  (not needed for iOS – auto-detected)
 #   FLAGS      - additional CMake flags
-#   PRECISION  - "double" to enable BOX3D_DOUBLE_PRECISION (large worlds)
+#   LARGE_WORLDS  - non-empty to enable BOX3D_DOUBLE_PRECISION (large worlds)
 #   BUILD_TYPE - CMake build type (default: Release)
 #   Android-only:
 #     ANDROID_ABI, ANDROID_NDK_VER, ANDROID_PLATFORM_VER
@@ -22,13 +22,13 @@ echo "PATH:       $PATH"
 echo "RUNNER_OS:  ${RUNNER_OS:-}"
 echo "NAME:       $NAME"
 echo "FLAGS:      ${FLAGS:-}"
-echo "PRECISION:  ${PRECISION:-single}"
+echo "LARGE_WORLDS:  ${LARGE_WORLDS:-false}"
 echo "BUILD_TYPE: ${BUILD_TYPE:-Release}"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
 # Precision suffix for output directory
-if [[ "${PRECISION:-}" == "double" ]]; then
+if [[ ${LARGE_WORLDS:-} ]]; then
   PRECISION_SUFFIX="/large-worlds"
   PRECISION_FLAG="-DBOX3D_DOUBLE_PRECISION=ON"
 else
