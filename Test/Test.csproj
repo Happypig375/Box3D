@@ -7,7 +7,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- required by mobile -->
     <ApplicationId>com.github.Happypig375.Box3D</ApplicationId>
-    <DefineConstants Condition="'$(LargeWorlds)' == 'true'">$(DefineConstants);LARGEWORLDS</DefineConstants>
+    <DefineConstants Condition="'$(LargeWorlds)' == 'true'">$(DefineConstants);LARGE_WORLDS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

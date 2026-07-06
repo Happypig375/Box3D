@@ -23,20 +23,28 @@ static class Program
 		b3WorldDef worldDef = b3DefaultWorldDef();
 		worldDef.gravity = new b3Vec3 { x = 0.0f, y = -10.0f, z = 0.0f };
 
+#if LARGE_WORLDS
+		b3WorldId worldId = b3CreateWorldDoublePrecision( &worldDef );
+#else
 		b3WorldId worldId = b3CreateWorld( &worldDef );
+#endif
 		if ( !b3World_IsValid( worldId ) )
-			return 1;
+			return 3001;
 
 		// Define the ground body.
 		b3BodyDef groundBodyDef = b3DefaultBodyDef();
+#if LARGE_WORLDS
+		groundBodyDef.position = new b3Pos { x = 0.0, y = -10.0, z = 0.0 };
+#else
 		groundBodyDef.position = new b3Vec3 { x = 0.0f, y = -10.0f, z = 0.0f };
+#endif
 
 		// Call the body factory which allocates memory for the ground body
 		// from a pool and creates the ground box shape (also from a pool).
 		// The body is also added to the world.
 		b3BodyId groundId = b3CreateBody( worldId, &groundBodyDef );
 		if ( !b3Body_IsValid( groundId ) )
-			return 1;
+			return 3002;
 
 		// Define the ground box shape. The extents are the half-widths of the box.
 		b3BoxHull groundBox = b3MakeBoxHull( 50.0f, 10.0f, 50.0f );
@@ -48,7 +56,11 @@ static class Program
 		// Define the dynamic body. We set its position and call the body factory.
 		b3BodyDef bodyDef = b3DefaultBodyDef();
 		bodyDef.type = b3BodyType.b3_dynamicBody;
+#if LARGE_WORLDS
+		bodyDef.position = new b3Pos { x = 0.0, y = 4.0, z = 0.0 };
+#else
 		bodyDef.position = new b3Vec3 { x = 0.0f, y = 4.0f, z = 0.0f };
+#endif
 
 		b3BodyId bodyId = b3CreateBody( worldId, &bodyDef );
 
@@ -73,7 +85,11 @@ static class Program
 		float timeStep = 1.0f / 60.0f;
 		int subStepCount = 4;
 
+#if LARGE_WORLDS
 		b3Vec3 position = b3Body_GetPosition( bodyId );
+#else
+		b3Pos position = b3Body_GetPosition( bodyId );
+#endif
 		b3Quat rotation = b3Body_GetRotation( bodyId );
 
 		// This is our little game loop.
@@ -94,12 +110,16 @@ static class Program
 		// create orphaned ids, so be careful about your world management.
 		b3DestroyWorld( worldId );
 
+#if LARGE_WORLDS
+		if ( Math.Abs( position.y - 1.00 ) > 0.01 )
+#else
 		if ( Math.Abs( position.y - 1.00f ) > 0.01f )
-			return 1;
+#endif
+			return 3003;
 		if ( Math.Abs( rotation.v.x ) > 0.01f )
-			return 1;
+			return 3004;
 		if ( Math.Abs( rotation.v.z ) > 0.01f )
-			return 1;
+			return 3005;
 
         Console.WriteLine("Test succeeded.");
 		return 0;

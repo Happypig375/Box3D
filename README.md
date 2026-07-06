@@ -3,10 +3,11 @@
 <p align="center"><b>C# bindings for <a href="https://github.com/erincatto/box3d">Box3D</a></b> — Erin Catto's 3D rigid body physics engine for games.</p>
 
 [![NuGet](https://img.shields.io/nuget/v/Box3D.svg)](https://www.nuget.org/packages/Box3D)
+[![NuGet](https://img.shields.io/nuget/v/Box3D.LargeWorlds.svg)](https://www.nuget.org/packages/Box3D.LargeWorlds)
 [![Build Status](https://github.com/Happypig375/Box3D/actions/workflows/build.yml/badge.svg)](https://github.com/Happypig375/Box3D/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-This package provides .NET bindings and prebuilt native binaries for the Box3D C library, so you can use a high-performance 3D physics engine from C# without compiling any C code yourself. The native libraries are built for **10 platforms** and packaged in a single NuGet package that works out of the box on desktop, mobile, and web.
+Two NuGet packages provide .NET bindings and prebuilt native binaries for the Box3D C library, so you can use a high-performance 3D physics engine from C# without compiling any C code yourself: **Box3D** (single-precision) and **Box3D.LargeWorlds** (double-precision for simulations spanning 100 km+). The native libraries are built for **10 platforms &times; 2 precisions** and work out of the box on desktop, mobile, and web.
 
 > [!IMPORTANT]
 > This is the C# wrapper repository. The physics engine itself is developed by Erin Catto at [erincatto/box3d](https://github.com/erincatto/box3d) and is included here as a git submodule. For physics documentation, tutorials, and the C API reference, refer to [Box3D documentation](https://box2d.org/documentation3d).
@@ -43,6 +44,8 @@ Box3D is a feature-complete 3D physics engine. Highlights include:
 ---
 
 ## Quick Start
+
+### Single-precision (Box3D)
 
 Save the following simulation of a box falling onto a ground plane to a C# file (e.g. `Box3D.cs`):
 
@@ -102,11 +105,29 @@ After running this file (e.g. `dotnet Box3D.cs`), the results show that the box 
 > [!TIP]
 > Box3D is tuned for **meters, kilograms, seconds**. Keep moving objects between 0.1 m and 10 m for best results. Refer to [Box3D documentation](https://box2d.org/documentation3d) for guidance on units and world size.
 
+### Double-precision (Box3D.LargeWorlds)
+
+For simulations spanning large distances (100 km+), use the `Box3D.LargeWorlds` package.
+
+```bash
+dotnet add package Box3D.LargeWorlds
+```
+
+There are a few differences compared to single precision:
+- All positions use `b3Pos` instead of `b3Vec3`
+- The world transform uses `b3WorldTransform` instead of `b3Transform`
+- World creation function is called `b3CreateWorldDoublePrecision` instead of `b3CreateWorld`
+
+Otherwise, all other types and functions stay the same. According to Erin Catto, there is a ~3% performance drop using double precision positions compared to single precision.
+
+> [!CAUTION]
+> You cannot use both Box3D and Box3D.LargeWorlds together. Native binaries will conflict with each other.
+
 ---
 
 ## Supported Platforms
 
-The NuGet package ships native binaries for the following runtimes — no additional native compilation is required on the consumer side.
+Both NuGet packages ship native binaries for the following runtimes — no additional native compilation is required on the consumer side.
 
 | Platform | Runtime Identifier (RID) | Native binary |
 |---|---|---|
@@ -132,7 +153,7 @@ This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime wi
 
 ## Usage
 
-The C# API mirrors the Box3D C API one-to-one. All public types live in the `Box3D` namespace and all public functions live under the `Box3D` partial class, so you can call them with `using static Box3D.Box3D;`:
+The C# API mirrors the Box3D C API one-to-one. All public types live in the `Box3D` (or `Box3D.LargeWorlds`) namespace and all public functions live under the corresponding partial class, so you can call them with `using static Box3D.Box3D;`:
 
 ```csharp
 using Box3D;
@@ -183,6 +204,18 @@ See the [Foundations section of Box3D documentation](https://box2d.org/documenta
 
 > [!CAUTION]
 > When using multithreading, do not perform read or write operations on a Box3D world during `b3World_Step()`. Do not write to the Box3D world from multiple threads. Any operation that wakes a body is not thread-safe.
+
+---
+
+### Build the LargeWorlds package
+
+Since `Box3D.LargeWorlds/Box3D.LargeWorlds.csproj` is a thin overlay that imports `Box3D.csproj` with two property overrides, the same build command works:
+
+```bash
+dotnet build Box3D.LargeWorlds/Box3D.LargeWorlds.csproj
+```
+
+This generates the C# bindings with `-D BOX3D_DOUBLE_PRECISION` passed to ClangSharp, producing `NativeMethods.cs` with `double`-precision types and the matching `DllImport` entry points. The native binaries are expected under `native/large-worlds/<platform>/`.
 
 ---
 
@@ -244,7 +277,7 @@ cmake --preset windows
 cmake --build --preset windows-release
 ```
 
-The CI script `build-native.sh` shows how the release binaries are built for all 10 platforms.
+The CI script `build-native.sh` handles all platforms (including iOS) and both precisions. Set `LARGE_WORLDS=true` to build the double-precision variant.
 
 ---
 
@@ -261,7 +294,16 @@ PreprocessHeaders  →  GenerateNativeBindings  →  PostProcessNativeMethods  �
 | Preprocess headers | `Scripts/StageHeaders.cs` | Copies `.h` files to `obj/`, rewrites `B3_LITERAL` compound literals and injects assertion macro stubs so ClangSharp can parse them |
 | Generate bindings | ClangSharpPInvokeGenerator | Produces `NativeMethods.cs` with P/Invoke declarations and inline function bodies |
 | Post-process | `Scripts/PostProcessNativeMethods.cs` | Remaps C math functions to `System.MathF`, fixes boolean comparisons, deduplicates declarations |
-| Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` for IntelliSense |
+| Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` (or `Box3D.LargeWorlds.xml`) for IntelliSense |
+
+### Dual-package architecture
+
+The two NuGet packages share a single codebase:
+
+- **`Box3D.csproj`** is the canonical project. It contains the full binding pipeline and references native binaries from `native/$(Box3DNativeSubdirectory)`. The subdirectory defaults to empty.
+- **`Box3D.LargeWorlds/Box3D.LargeWorlds.csproj`** is a 6-line overlay that sets `Box3DNativeSubdirectory=large-worlds/` and `Box3DClangDefines=-a;-D;-a;BOX3D_DOUBLE_PRECISION`, then imports `../Box3D.csproj`. This reuses every target and item group from the canonical project — no duplication.
+
+The CI builds all 10 platforms &times; 2 precisions in a single matrix, producing 20 native binaries that are assembled into the two packages.
 
 The package version is derived automatically from the submodule's `CMakeLists.txt` with a date-based revision suffix, so it always reflects the upstream version you're binding against.
 
@@ -269,20 +311,26 @@ The package version is derived automatically from the submodule's `CMakeLists.tx
 
 ## CI/CD
 
-Two GitHub Actions workflows keep the package up to date:
+Two GitHub Actions workflows keep the packages up to date:
 
 ### `build.yml` — Native binary builds
 
-Triggered on every push, this workflow builds the native Box3D shared library for all 10 platforms using a matrix of GitHub-hosted runners:
+Triggered on every push, this workflow builds the native Box3D shared library for all 10 platforms &times; 2 precisions using a matrix of GitHub-hosted runners, then packs and validates both NuGet packages.
+
+The build matrix has two dimensions: `large-worlds` (empty for single-precision, `large-worlds` for double-precision) and `platform` (10 target platforms):
 
 - **Windows** (x64, ARM64) — MSVC, static CRT
 - **Linux** (x64, ARM64) — Ninja
-- **macOS** (ARM64) — Xcode
+- **macOS** (ARM64) — Ninja
 - **Android** (ARM64, x64) — Android NDK
 - **iOS** (ARM64 device, ARM64 simulator) — Xcode with framework packaging
 - **Mac Catalyst** (ARM64) — Clang with framework packaging
 
-Each platform's binary is uploaded as a build artifact and later assembled into the NuGet package's `runtimes/` folder.
+Each precision&ndash;platform combination runs the single `build-native.sh` script, which handles Android, iOS, and desktop builds in a single code path. The resulting binaries are compressed and uploaded as named artifacts (`native-{large-worlds}-{platform}.tar`).
+
+The `pack-nuget` job then downloads the matching artifacts, runs the MSBuild binding pipeline (header staging &rarr; ClangSharp &rarr; post-process &rarr; compile &rarr; doc gen), and produces the `.nupkg`. A `validate` job exercises the package on all desktop and mobile platforms.
+
+Both packages are pushed to NuGet.org on every push to `master`.
 
 ### `update.yml` — Daily submodule update
 
