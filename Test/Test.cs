@@ -86,9 +86,9 @@ static class Program
 		int subStepCount = 4;
 
 #if LARGE_WORLDS
-		b3Vec3 position = b3Body_GetPosition( bodyId );
-#else
 		b3Pos position = b3Body_GetPosition( bodyId );
+#else
+		b3Vec3 position = b3Body_GetPosition( bodyId );
 #endif
 		b3Quat rotation = b3Body_GetRotation( bodyId );
 

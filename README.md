@@ -2,8 +2,8 @@
 
 <p align="center"><b>C# bindings for <a href="https://github.com/erincatto/box3d">Box3D</a></b> — Erin Catto's 3D rigid body physics engine for games.</p>
 
-[![NuGet](https://img.shields.io/nuget/v/Box3D.svg)](https://www.nuget.org/packages/Box3D)
-[![NuGet](https://img.shields.io/nuget/v/Box3D.LargeWorlds.svg)](https://www.nuget.org/packages/Box3D.LargeWorlds)
+[![NuGet](https://img.shields.io/nuget/v/Box3D.svg?label=NuGet%3A%20Box3D)](https://www.nuget.org/packages/Box3D)
+[![NuGet](https://img.shields.io/nuget/v/Box3D.LargeWorlds.svg?label=NuGet%3A%20Box3D.LargeWorlds)](https://www.nuget.org/packages/Box3D.LargeWorlds)
 [![Build Status](https://github.com/Happypig375/Box3D/actions/workflows/build.yml/badge.svg)](https://github.com/Happypig375/Box3D/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
