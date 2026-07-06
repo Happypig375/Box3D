@@ -1,6 +1,10 @@
 using System.Text.RegularExpressions;
 
+#if LARGE_WORLDS
+var xmlFile = "../Box3D.LargeWorlds/Box3D.xml";
+#else
 var xmlFile = "../Box3D.xml";
+#endif
 var headersDir = "../box3d/include/box3d";
 
 var xml = File.ReadAllText(xmlFile);

@@ -111,7 +111,7 @@ jobs:
           if-no-files-found: error
       - name: Validate XML documentation coverage
         shell: bash
-        run: cd Scripts && dotnet run DocCoverage.cs
+        run: cd Scripts && dotnet run DocCoverage.cs ${{ matrix.large-worlds && '-p DefineConstants=LARGE_WORLDS' }}
 
   validate:
     name: Validate ${{ matrix.large-worlds && 'Box3D.LargeWorlds' || 'Box3D' }} on ${{ matrix.platform.name }}
