@@ -1,3 +1,5 @@
+// Remember to update DocCoverage.cs to test for any new documentation patterns added to this script!
+
 using System.Text;
 using System.Text.RegularExpressions;
 

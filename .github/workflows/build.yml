@@ -202,6 +202,10 @@ jobs:
           archive: false # don't put in zip, just upload the nupkg file
           if-no-files-found: error
 
+      - name: Validate XML documentation coverage
+        shell: bash
+        run: cd Scripts && dotnet run DocCoverage.cs
+
   validate:
     name: Validate NuGet package on ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
