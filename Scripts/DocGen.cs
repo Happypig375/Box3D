@@ -248,9 +248,23 @@ string? ExtractCommentBlock(string[] lines, ref int idx)
             return (ctxName + "." + m.Groups[1].Value, ctxName + ".xml");
     }
 
+    // struct/union opening declaration: typedef struct|union Name (opening brace on next line)
+    m = R.TypedefStructType.Match(t);
+    if (m.Success)
+    {
+        var typeName = m.Groups[3].Value;
+        if (!string.IsNullOrEmpty(typeName))
+            return (typeName, typeName + ".xml");
+    }
+
     // function pointer typedef: typedef ... (*Name)...
     m = R.FnPtrTypedef.Match(t);
     if (m.Success) return ("Box3D." + m.Groups[1].Value, "Box3D.xml");
+
+    // function pointer typedef with direct syntax: typedef returnType Name(params)
+    // e.g. typedef void* b3AllocFcn( int32_t size, int32_t alignment );
+    m = R.TypedefFuncPtr.Match(t);
+    if (m.Success) return (m.Groups[1].Value, m.Groups[1].Value + ".xml");
 
     // standalone typedef: typedef ... Name;
     m = R.Typedef.Match(t);
@@ -283,6 +297,22 @@ foreach (var hf in headerFiles)
             i++;
             continue;
         }
+        // Also handle typedef struct|union Name when { is on the next line
+        if (contextType == "" || contextName == "")
+        {
+            ctxMatch = R.TypedefStructType.Match(trimmed);
+            if (ctxMatch.Success)
+            {
+                var typeName = ctxMatch.Groups[3].Value;
+                if (!string.IsNullOrEmpty(typeName))
+                {
+                    contextType = "struct";
+                    contextName = typeName;
+                    i++;
+                    continue;
+                }
+            }
+        }
         ctxMatch = R.EnumOpen.Match(trimmed);
         if (ctxMatch.Success)
         {
@@ -291,7 +321,7 @@ foreach (var hf in headerFiles)
             i++;
             continue;
         }
-        if (trimmed is "};" or "}")
+        if (trimmed is "};" or "}" || R.StructClose.IsMatch(trimmed))
         {
             contextType = "";
             contextName = "";
@@ -351,6 +381,50 @@ foreach (var hf in headerFiles)
         else
         {
             i = saveI + 1;
+        }
+    }
+}
+
+// ---- Ensure all members referenced in NativeMethods.cs <include> elements have entries ----
+// ClangSharp generates <include> for every declaration, even undocumented ones.
+// Without a matching <member>, the C# compiler emits "cannot be included" warnings.
+{
+    var existingMemberNames = new HashSet<string>();
+    foreach (var kv in members)
+    {
+        foreach (var memberXml in kv.Value)
+        {
+            var m = Regex.Match(memberXml, @"name=""([^""]+)""");
+            if (m.Success) existingMemberNames.Add(m.Groups[1].Value);
+        }
+    }
+
+    if (File.Exists(nativeMethodsFile))
+    {
+        var nmContent = File.ReadAllText(nativeMethodsFile);
+        var includeRegex = new Regex(
+            @"<include\s+file='[^']*\.xml'\s+path='doc/member\[@name=""([^""]+)""\]/\*' />",
+            RegexOptions.Compiled);
+        int addedMembers = 0;
+
+        foreach (Match match in includeRegex.Matches(nmContent))
+        {
+            var memberName = match.Groups[1].Value;
+            if (!existingMemberNames.Contains(memberName))
+            {
+                var xml = BuildMemberXml(memberName, null, null, null);
+                string xmlFile = "Box3D.xml";
+                if (!members.ContainsKey(xmlFile)) members[xmlFile] = new List<string>();
+                members[xmlFile].Add(xml);
+                existingMemberNames.Add(memberName);
+                addedMembers++;
+            }
+        }
+
+        if (addedMembers > 0)
+        {
+            Console.WriteLine($"Added {addedMembers} undocumented members from NativeMethods.cs includes");
+            totalMembers += addedMembers;
         }
     }
 }
@@ -424,5 +498,7 @@ static class R
     internal static readonly Regex EnumValEq = new(@"^(\w+)\s*=\s*\d+", RegexOptions.Compiled);
     internal static readonly Regex EnumVal = new(@"^(\w+)\s*,?", RegexOptions.Compiled);
     internal static readonly Regex FnPtrTypedef = new(@"typedef\s+.*?\(\*\s*(\w+)\)", RegexOptions.Compiled);
+    internal static readonly Regex TypedefFuncPtr = new(@"^typedef\s+(?!struct|union)[^;]*?\b(\w+)\s*\(", RegexOptions.Compiled);
+    internal static readonly Regex TypedefStructType = new(@"^(typedef\s+)?(struct|union)\s+(\w+)", RegexOptions.Compiled);
     internal static readonly Regex Typedef = new(@"^typedef\s+.*?\s+(\w+)\s*;", RegexOptions.Compiled);
 }
