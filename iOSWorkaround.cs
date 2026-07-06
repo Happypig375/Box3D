@@ -1,5 +1,6 @@
 namespace Box3D;
 
+using System;
 using System.Runtime.InteropServices;
 public partial class Box3D
 {
