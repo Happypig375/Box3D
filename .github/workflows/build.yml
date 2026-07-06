@@ -75,9 +75,9 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          - { name: ios-arm64,          flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0,                    output: ios,          sdk: iphoneos }
-          - { name: iossimulator-arm64, flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphonesimulator -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: iossimulator, sdk: iphonesimulator }
-          - { name: maccatalyst-arm64,  flags: -GXcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0, output: maccatalyst,  sdk: maccatalyst }
+          - { name: ios-arm64 }
+          - { name: iossimulator-arm64 }
+          - { name: maccatalyst-arm64 }
     name: Build ${{ matrix.platform.name }}
     runs-on: macos-latest
     steps:
@@ -111,7 +111,12 @@ jobs:
             cmake --build build-${{ matrix.platform.name }} --config $BUILD_TYPE
           else
             cmake -S box3d -B build-${{ matrix.platform.name }} \
-              ${{ matrix.platform.flags }} \
+              -GXcode \
+              -DCMAKE_SYSTEM_NAME=iOS \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+              ${{ case(matrix.platform.name == 'iossimulator-arm64', '-DCMAKE_OSX_SYSROOT=iphonesimulator', '') }} \
+              -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-install_name,@rpath/box3d.framework/box3d \
               -DBUILD_SHARED_LIBS=ON \
               -DBOX3D_SAMPLES=OFF \
               -DBOX3D_UNIT_TESTS=OFF \
@@ -220,9 +225,10 @@ jobs:
           - { name: linux-x64,       os: ubuntu-latest,    tfm: net10.0 }
           - { name: linux-arm64,     os: *ubuntu-latest-arm, tfm: net10.0 }
           - { name: osx-arm64,       os: macos-latest,     tfm: net10.0 }
-          # - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android } # for some reason the app won't install
+          - { name: android-arm64,   os: ubuntu-latest,    tfm: net10.0-android, build-only: true } # Didn't find a way to run this on CI without hanging
           - { name: android-x64,     os: ubuntu-latest,    tfm: net11.0-android }
-          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios } # Don't validate iOS as it requires a real device
+          - { name: ios-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios, build-only: true } # Running requires a real device
+          - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios }
           - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net11.0-maccatalyst }
     steps:
       - uses: actions/checkout@v7
@@ -306,13 +312,17 @@ jobs:
           merge-multiple: true
           path: ./artifacts
 
+      - name: Validate build
+        if: matrix.platform.build-only == true
+        run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }}
+
       # For Android: start emulator and run validation inside its script parameter
       - name: Enable KVM # Soeeds up emulator startup time from 15 minutes to 2.5 minutes
-        if: contains(matrix.platform.name, 'android')
+        if: matrix.platform.build-only != true && contains(matrix.platform.name, 'android')
         run: |
           sudo chown $USER /dev/kvm || echo "KVM not accessible"
       - name: Validate on Android emulator
-        if: contains(matrix.platform.name, 'android')
+        if: matrix.platform.build-only != true && contains(matrix.platform.name, 'android')
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35 # must at least be 35. see https://github.com/ReactiveCircus/android-emulator-runner/issues/458
@@ -327,7 +337,7 @@ jobs:
           
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
-        if: "!contains(matrix.platform.name, 'android')"
+        if: matrix.platform.build-only != true && !contains(matrix.platform.name, 'android')
         shell: bash
         run: |
           cd Test

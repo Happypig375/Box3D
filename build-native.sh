@@ -18,11 +18,6 @@ CMAKE_FLAGS=""
 # Disable samples, tests, and validation for all platforms
 CMAKE_FLAGS="-DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_VALIDATE=OFF"
 
-# Keep import library (.lib) alongside the DLL on Windows multi-config builds
-if [[ "${RUNNER_OS}" == "Windows" ]]; then
-  CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=build/bin"
-fi
-
 if [[ "${NAME}" == android-* ]]; then
   # Android cross-compilation via NDK
   TOOLCHAIN="${ANDROID_HOME}/ndk/${ANDROID_NDK_VER}/build/cmake/android.toolchain.cmake"
