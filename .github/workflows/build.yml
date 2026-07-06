@@ -221,17 +221,6 @@ jobs:
         with:
           xcode-version: ${{ steps.ios-version.outputs.xcode-version }}
 
-      # For double precision on Linux: Clang headers for binding generation
-      - name: Set up Clang (.so resolution and headers)
-        if: matrix.precision == 'double' && runner.os == 'Linux'
-        uses: ./.github/actions/setup-dotnet-clang
-
-      # Build LargeWorlds project to validate the full binding pipeline
-      - name: Build Box3D.LargeWorlds project
-        if: matrix.precision == 'double'
-        shell: bash
-        run: dotnet build Box3D.LargeWorlds/Box3D.LargeWorlds.csproj -c $BUILD_TYPE
-
       - name: Download NuGet package
         uses: actions/download-artifact@v8
         with:
@@ -264,7 +253,7 @@ jobs:
             dotnet run
             -p TargetFrameworks="${{ matrix.platform.tfm }}"
             -r "${{ matrix.platform.name }}"
-            -p:Box3DPackageId=${{ matrix.precision == 'double' && 'Box3D.LargeWorlds' || 'Box3D' }}
+            ${{ case(matrix.precision == 'double', '-p:LargeWorlds=true', '') }}
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
