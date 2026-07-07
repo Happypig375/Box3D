@@ -122,7 +122,6 @@ Otherwise, all other types and functions stay the same. According to Erin Catto,
 
 > [!CAUTION]
 > You cannot use both Box3D and Box3D.LargeWorlds together. Native binaries will conflict with each other.
-
 ---
 
 ## Supported Platforms
@@ -204,6 +203,85 @@ See the [Foundations section of Box3D documentation](https://box2d.org/documenta
 
 > [!CAUTION]
 > When using multithreading, do not perform read or write operations on a Box3D world during `b3World_Step()`. Do not write to the Box3D world from multiple threads. Any operation that wakes a body is not thread-safe.
+
+### Passing user data
+
+You can associate application-specific data (e.g. a game object) with any Box3D object. There are two common approaches:
+
+#### Option A: External dictionary (recommended for most users)
+
+Use a `Dictionary<b3BodyId, T>` (or `b3ShapeId`, `b3JointId`, `b3WorldId`) to map physics objects back to your game entities. Box3D's Id types embed a serial number, so stale Ids won't accidentally collide with newly created objects.
+
+```csharp
+record Player(int Health = 100, string Name = "Player 1");
+var players = new Dictionary<b3BodyId, Player>();
+
+b3BodyDef bodyDef = b3DefaultBodyDef();
+bodyDef.position = new b3Vec3 { x = 0, y = 5, z = 0 };
+bodyDef.type = b3BodyType.b3_dynamicBody;
+b3BodyId bodyId = b3CreateBody(worldId, &bodyDef);
+
+players[bodyId] = new Player { Health = 100, Name = "Hero" };
+
+// Later, look up from an event
+// b3BodyMoveEvent moveEvent = ...;
+if (players.TryGetValue(moveEvent.bodyId, out Player player))
+{
+    Console.WriteLine(player.Name);
+}
+
+// Clean up when body is destroyed
+// b3BodyDestroy(bodyId);
+players.Remove(bodyId);
+```
+
+This approach needs no `unsafe`, no pointer casts, and no handle lifetime management. It also works uniformly with all Id types.
+
+#### Option B: `GCHandle` via `void* userData`
+
+The `userData` field on `b3WorldDef`, `b3BodyDef`, `b3ShapeDef`, and `b3JointDef` is a `void*` — a raw pointer. You can also get/set it after creation via `b3World_SetUserData`/`b3World_GetUserData`, `b3Body_SetUserData`/`b3Body_GetUserData`, etc. Event structs (`b3BodyMoveEvent`, `b3JointEvent`) carry the same pointer back to you.
+
+Since you cannot directly cast a C# reference type to `void*`, use `GCHandle` to safely box a managed object:
+
+```csharp
+using System.Runtime.InteropServices;
+
+record Player(int Health = 100, string Name = "Player 1");
+unsafe
+{
+    b3BodyDef bodyDef = b3DefaultBodyDef();
+    bodyDef.position = new b3Vec3 { x = 0, y = 5, z = 0 };
+    bodyDef.type = b3BodyType.b3_dynamicBody;
+
+    // Box a Player instance into a GCHandle and store it in userData
+    var player = new Player();
+    GCHandle gcHandle = GCHandle.Alloc(player);
+    bodyDef.userData = (void*)GCHandle.ToIntPtr(gcHandle);
+
+    b3BodyId bodyId = b3CreateBody(worldId, &bodyDef);
+
+    // Later, retrieve the Player from a body move event
+    b3BodyMoveEvent moveEvent = ...;
+    Player retrievedPlayer = (Player)GCHandle.FromIntPtr((nint)moveEvent.userData).Target;
+    Console.WriteLine(retrievedPlayer.Name);  // "Player 1"
+}
+```
+
+> [!IMPORTANT]
+> You **must** free the `GCHandle` when the associated Box3D object is destroyed, otherwise the managed object will never be garbage collected:
+
+```csharp
+unsafe void OnBodyDestroyed(b3BodyId bodyId)
+{
+    void* userData = b3Body_GetUserData(bodyId);
+    if (userData != null)
+    {
+        GCHandle.FromIntPtr((nint)userData).Free();
+    }
+}
+```
+
+This gives you zero-overhead lookup directly from the pointer, at the cost of `unsafe` code and careful lifetime management. Prefer this only when you are deeply in `unsafe` context and want to avoid the (very cheap) dictionary hash lookup.
 
 ---
 
