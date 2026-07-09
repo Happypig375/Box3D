@@ -28,7 +28,9 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "commit=$(cd box3d && git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-            echo "msg=$(cd box3d && git log -1 --pretty=%B)" >> "$GITHUB_OUTPUT"
+            echo "msg<<Mf2xQ8kLp3ZvR7wY" >> "$GITHUB_OUTPUT"
+            (cd box3d && git log -1 --pretty=%B) >> "$GITHUB_OUTPUT"
+            echo "Mf2xQ8kLp3ZvR7wY" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up .NET and Clang
