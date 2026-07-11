@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <PropertyGroup Label="NuGet">
+    <PackageDescription>C# bindings for Box3D — Erin Catto's 3D rigid body physics engine for games.</PackageDescription>
     <Authors>Erin Catto, Hadrian Tang</Authors>
     <Copyright>Copyright (c) 2026 Erin Catto, Hadrian Tang</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
