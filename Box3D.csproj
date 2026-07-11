@@ -56,6 +56,8 @@
     <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)ios-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/ios-arm64/native/box3d.framework" />
     <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)iossimulator-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/iossimulator-arm64/native/box3d.framework" />
     <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)maccatalyst-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/maccatalyst-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)tvos-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/tvos-arm64/native/box3d.framework" />
+    <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)tvossimulator-arm64\box3d.framework\**\*" Pack="true" PackagePath="runtimes/tvossimulator-arm64/native/box3d.framework" />
     <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)android\arm64-v8a\libbox3d.so" Pack="true" PackagePath="runtimes/android-arm64/native/" />
     <None Include="$(MSBuildThisFileDirectory)native\$(Box3DNativeSubdirectory)android\x86_64\libbox3d.so" Pack="true" PackagePath="runtimes/android-x64/native/" />
   </ItemGroup>

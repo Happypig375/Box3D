@@ -4,8 +4,8 @@
 # for double precision) for NuGet packaging.
 #
 # Works as both a standalone script and from CI.  Apple platforms (iOS,
-# iOS Simulator, Mac Catalyst) create a .framework bundle; all others
-# produce a raw shared library.
+# iOS Simulator, tvOS, tvOS Simulator, Mac Catalyst) create a .framework
+# bundle; all others produce a raw shared library.
 #
 # Environment variables:
 #   NAME       - platform name (e.g. win-x64, linux-arm64, ios-arm64)
@@ -46,7 +46,7 @@ fi
 # ---------------------------------------------------------------------------
 # iOS / iOS Simulator / Mac Catalyst
 # ---------------------------------------------------------------------------
-if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == maccatalyst-* ]]; then
+if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* || "${NAME}" == tvossimulator-* || "${NAME}" == maccatalyst-* ]]; then
   echo "--- Building for Apple platform: ${NAME} ---"
 
   if [[ "${NAME}" == "maccatalyst-arm64" ]]; then
@@ -72,12 +72,20 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == maccatal
       -DBOX3D_VALIDATE=OFF
     cmake --build build --config "${BUILD_TYPE}"
   else
-    # iOS / iOS Simulator: Xcode generator
+    # iOS / iOS Simulator / tvOS / tvOS Simulator: Xcode generator
+    APPLE_SDK_NAME="iOS"
     SIMULATOR_FLAG=""
-    [[ "${NAME}" == "iossimulator-arm64" ]] && SIMULATOR_FLAG="-DCMAKE_OSX_SYSROOT=iphonesimulator"
+    if [[ "${NAME}" == "iossimulator-arm64" ]]; then
+      SIMULATOR_FLAG="-DCMAKE_OSX_SYSROOT=iphonesimulator"
+    elif [[ "${NAME}" == tvos-* ]]; then
+      APPLE_SDK_NAME="tvOS"
+    elif [[ "${NAME}" == tvossimulator-* ]]; then
+      APPLE_SDK_NAME="tvOS"
+      SIMULATOR_FLAG="-DCMAKE_OSX_SYSROOT=appletvsimulator"
+    fi
     cmake -S box3d -B build \
       -GXcode \
-      -DCMAKE_SYSTEM_NAME=iOS \
+      -DCMAKE_SYSTEM_NAME="${APPLE_SDK_NAME}" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       ${SIMULATOR_FLAG} \

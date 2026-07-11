@@ -7,7 +7,7 @@
 [![Build Status](https://github.com/Happypig375/Box3D/actions/workflows/build.yml/badge.svg)](https://github.com/Happypig375/Box3D/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-Two NuGet packages provide .NET bindings and prebuilt native binaries for the Box3D C library, so you can use a high-performance 3D physics engine from C# without compiling any C code yourself: **Box3D** (single-precision) and **Box3D.LargeWorlds** (double-precision for simulations spanning 100 km+). The native libraries are built for **10 platforms &times; 2 precisions** and work out of the box on desktop, mobile, and web.
+Two NuGet packages provide .NET bindings and prebuilt native binaries for the Box3D C library, so you can use a high-performance 3D physics engine from C# without compiling any C code yourself: **Box3D** (single-precision) and **Box3D.LargeWorlds** (double-precision for simulations spanning 100 km+). The native libraries are built for **12 platforms &times; 2 precisions** and work out of the box on desktop, mobile, and web.
 
 > [!IMPORTANT]
 > This is the C# wrapper repository. The physics engine itself is developed by Erin Catto at [erincatto/box3d](https://github.com/erincatto/box3d) and is included here as a git submodule. For physics documentation, tutorials, and the C API reference, refer to [Box3D documentation](https://box2d.org/documentation3d).
@@ -137,6 +137,8 @@ Both NuGet packages ship native binaries for the following runtimes — no addit
 | macOS ARM64 | `osx-arm64` | `libbox3d.dylib` |
 | iOS (device) | `ios-arm64` | `box3d.framework` |
 | iOS Simulator | `iossimulator-arm64` | `box3d.framework` |
+| tvOS (device) | `tvos-arm64` | `box3d.framework` |
+| tvOS Simulator | `tvossimulator-arm64` | `box3d.framework` |
 | Mac Catalyst | `maccatalyst-arm64` | `box3d.framework` |
 | Android ARM64 | `android-arm64` | `libbox3d.so` |
 | Android x64 | `android-x64` | `libbox3d.so` |
@@ -144,7 +146,7 @@ Both NuGet packages ship native binaries for the following runtimes — no addit
 The correct binary is loaded automatically at runtime via NuGet's RID-based `runtimes/<rid>/native/` convention.
 
 > [!WARNING]
-> For iOS/Android/Mac Catalyst, only .NET 11+ is supported. For .NET 10 Android, using `<UseMonoRuntime>false</UseMonoRuntime>` property is also supported.
+> For iOS/tvOS/Android/Mac Catalyst, only .NET 11+ is supported. For .NET 10 Android, using `<UseMonoRuntime>false</UseMonoRuntime>` property is also supported.
 
 This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime will crash on any invocation of `b3DefaultWorldDef()` because it does not support function pointer fields in struct return types during P/Invoke.
 
@@ -381,7 +383,7 @@ The two NuGet packages share a single codebase:
 - **`Box3D.csproj`** is the canonical project. It contains the full binding pipeline and references native binaries from `native/$(Box3DNativeSubdirectory)`. The subdirectory defaults to empty.
 - **`Box3D.LargeWorlds/Box3D.LargeWorlds.csproj`** is a 6-line overlay that sets `Box3DNativeSubdirectory=large-worlds/` and `Box3DClangDefines=-a;-D;-a;BOX3D_DOUBLE_PRECISION`, then imports `../Box3D.csproj`. This reuses every target and item group from the canonical project — no duplication.
 
-The CI builds all 10 platforms &times; 2 precisions in a single matrix, producing 20 native binaries that are assembled into the two packages.
+The CI builds all 12 platforms &times; 2 precisions in a single matrix, producing 24 native binaries that are assembled into the two packages.
 
 The package version is derived automatically from the submodule's `CMakeLists.txt` with a date-based revision suffix, so it always reflects the upstream version you're binding against.
 
@@ -393,16 +395,17 @@ Two GitHub Actions workflows keep the packages up to date:
 
 ### `build.yml` — Native binary builds
 
-Triggered on every push, this workflow builds the native Box3D shared library for all 10 platforms &times; 2 precisions using a matrix of GitHub-hosted runners, then packs and validates both NuGet packages.
+Triggered on every push, this workflow builds the native Box3D shared library for all 12 platforms &times; 2 precisions using a matrix of GitHub-hosted runners, then packs and validates both NuGet packages.
 
-The build matrix has two dimensions: `large-worlds` (empty for single-precision, `large-worlds` for double-precision) and `platform` (10 target platforms):
+The build matrix has two dimensions: `large-worlds` (empty for single-precision, `large-worlds` for double-precision) and `platform` (12 target platforms):
 
 - **Windows** (x64, ARM64) — MSVC, static CRT
 - **Linux** (x64, ARM64) — Ninja
 - **macOS** (ARM64) — Ninja
 - **Android** (ARM64, x64) — Android NDK
 - **iOS** (ARM64 device, ARM64 simulator) — Xcode with framework packaging
-- **Mac Catalyst** (ARM64) — Clang with framework packaging
+- **tvOS** (ARM64 device, ARM64 simulator) — Xcode with framework packaging
+- **Mac Catalyst** (ARM64) — Unix makefiles with framework packaging
 
 Each precision&ndash;platform combination runs the single `build-native.sh` script, which handles Android, iOS, and desktop builds in a single code path. The resulting binaries are compressed and uploaded as named artifacts (`native-{large-worlds}-{platform}.tar`).
 
