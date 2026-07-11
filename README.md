@@ -148,7 +148,7 @@ The correct binary is loaded automatically at runtime via NuGet's RID-based `run
 > [!WARNING]
 > For iOS/tvOS/Android/Mac Catalyst, only .NET 11+ is supported. For .NET 10 Android, using `<UseMonoRuntime>false</UseMonoRuntime>` property is also supported.
 
-This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime will crash on any invocation of `b3DefaultWorldDef()` because it does not support function pointer fields in struct return types during P/Invoke.
+This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime will crash on any invocation of `b3DefaultWorldDef()` because it does not support function pointer fields in struct return types during P/Invoke. This also means we cannot support browser WASM until it migrates to CoreCLR, to be expected for .NET 12.
 
 ---
 
