@@ -154,7 +154,7 @@ This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime wi
 
 ## Usage
 
-The C# API mirrors the Box3D C API one-to-one. All public types live in the `Box3D` (or `Box3D.LargeWorlds`) namespace and all public functions live under the corresponding partial class, so you can call them with `using static Box3D.Box3D;`:
+The C# API mirrors the Box3D C API one-to-one. All public types live in the `Box3D` namespace and all public functions live under a static class of the same name, so you can call them with `using static Box3D.Box3D;`:
 
 ```csharp
 using Box3D;
