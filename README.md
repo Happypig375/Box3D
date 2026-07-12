@@ -328,9 +328,9 @@ dotnet build
 ```
 
 This will:
-1. **Stage** the C headers from `box3d/include/box3d/` into `obj/headers/`, preprocessing `math_functions.h` to replace C compound literals (`B3_LITERAL`) with C#-compatible member initialization.
+1. **Stage** the C headers from `box3d/include/box3d/` into `obj/headers/`, preprocessing `math_functions.h` to replace C compound literals (`B3_LITERAL`) with ClangSharpPInvokeGenerator-compatible member initialization.
 2. **Generate** `NativeMethods.cs` using [ClangSharpPInvokeGenerator](https://github.com/dotnet/clangsharp) (pinned via `dotnet-tools.json`).
-3. **Post-process** the generated code to remap C math functions (`sqrtf` → `System.MathF.Sqrt`), fix `bool != 0` comparisons, and remove duplicate declarations.
+3. **Post-process** the generated code to remap C math functions (`sqrtf` → `System.MathF.Sqrt`) and fix `bool != 0` comparisons.
 4. **Compile** the package and produce `Box3D.dll` + `Box3D.xml` (XML documentation).
 
 > [!NOTE]
@@ -373,7 +373,7 @@ PreprocessHeaders  →  GenerateNativeBindings  →  PostProcessNativeMethods  �
 |---|---|---|
 | Preprocess headers | `Scripts/StageHeaders.cs` | Copies `.h` files to `obj/`, rewrites `B3_LITERAL` compound literals and injects assertion macro stubs so ClangSharp can parse them |
 | Generate bindings | ClangSharpPInvokeGenerator | Produces `NativeMethods.cs` with P/Invoke declarations and inline function bodies |
-| Post-process | `Scripts/PostProcessNativeMethods.cs` | Remaps C math functions to `System.MathF`, fixes boolean comparisons, deduplicates declarations |
+| Post-process | `Scripts/PostProcessNativeMethods.cs` | Remaps C math functions to `System.MathF`, fixes boolean comparisons |
 | Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` (or `Box3D.LargeWorlds.xml`) for IntelliSense |
 
 ### Dual-package architecture
