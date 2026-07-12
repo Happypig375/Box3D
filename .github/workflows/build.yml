@@ -132,7 +132,7 @@ jobs:
             ${{ contains(matrix.platform.name, 'android') && 'android' ||
                 contains(matrix.platform.name, 'ios') && 'ios' ||
                 contains(matrix.platform.name, 'tvos') && 'tvos' ||
-                contains(matrix.platform.name, 'maccatalyst') && 'maccatalyst' }}
+                contains(matrix.platform.name, 'maccatalyst') && 'maccatalyst' || '' }}
 
       # Apple syncs version numbers across iOS, tvOS, macOS, and Xcode; e.g. the
       # .NET iOS workload version matches: 26.5.10284 → iOS 26.5 → Xcode 26.5.
