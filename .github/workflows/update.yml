@@ -68,5 +68,5 @@ jobs:
           ## ${{ steps.check.outputs.msg }}
           Mf2xQ8kLp3ZvR7wY
           git commit -F /tmp/commit_msg
-          git remote set-url origin https://${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}
+          git remote set-url origin https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}
           git push
