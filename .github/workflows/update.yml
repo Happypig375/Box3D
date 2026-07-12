@@ -2,20 +2,35 @@ name: Update Submodule
 
 on:
   schedule:
-    - cron: '0 6 * * *'   # Daily at 06:00 UTC
-  workflow_dispatch:        # Allow manual trigger
+    - cron: 0 6 * * * # Daily at 06:00 UTC
+  workflow_dispatch:  # Allow manual trigger
 
 permissions:
   contents: write
 
 jobs:
   update:
+    if: ${{ vars.APP_CLIENT_ID != '' }}
     runs-on: ubuntu-latest
     steps:
+      # By default, the GITHUB_TOKEN provided to workflows cannot trigger other workflows on push events.
+      # To work around this, we use a GitHub App token instead of the default GITHUB_TOKEN to push changes.
+      # This allows us to trigger other workflows on push events.
+      # See https://github.com/orgs/community/discussions/55906
+      - name: Obtain a new GitHub App installation token to trigger workflows on push
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.APP_CLIENT_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          token: ${{ steps.app-token.outputs.token }}
           submodules: recursive
+          # Make sure the value of GITHUB_TOKEN will not be persisted in repo's config
+          persist-credentials: false
 
       - name: Update box3d submodule to latest upstream commit
         run: git submodule update --remote box3d
@@ -47,10 +62,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add box3d
-          cat > /tmp/commit_msg <<'GITCOMMIT_EOF'
+          cat > /tmp/commit_msg <<'Mf2xQ8kLp3ZvR7wY'
           Update box3d to https://github.com/erincatto/box3d/commit/${{ steps.check.outputs.commit }}
 
           ## ${{ steps.check.outputs.msg }}
-          GITCOMMIT_EOF
+          Mf2xQ8kLp3ZvR7wY
           git commit -F /tmp/commit_msg
+          git remote set-url origin https://${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}
           git push
