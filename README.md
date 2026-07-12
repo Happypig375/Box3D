@@ -287,18 +287,6 @@ This gives you zero-overhead lookup directly from the pointer, at the cost of `u
 
 ---
 
-### Build the LargeWorlds package
-
-Since `Box3D.LargeWorlds/Box3D.LargeWorlds.csproj` is a thin overlay that imports `Box3D.csproj` with two property overrides, the same build command works:
-
-```bash
-dotnet build Box3D.LargeWorlds/Box3D.LargeWorlds.csproj
-```
-
-This generates the C# bindings with `-D BOX3D_DOUBLE_PRECISION` passed to ClangSharp, producing `NativeMethods.cs` with `double`-precision types and the matching `DllImport` entry points. The native binaries are expected under `native/large-worlds/<platform>/`.
-
----
-
 ## Building from Source
 
 ### Prerequisites
@@ -321,7 +309,7 @@ If you already cloned without `--recurse-submodules`:
 git submodule update --init --recursive
 ```
 
-### Build the C# package
+### Build Box3D package
 
 ```bash
 dotnet build
@@ -334,10 +322,20 @@ This will:
 4. **Compile** the package and produce `Box3D.dll` + `Box3D.xml` (XML documentation).
 
 > [!NOTE]
-> `NativeMethods.cs` is generated at build time and is not committed to the repository. It is listed in `.gitignore`.
+> `NativeMethods.cs` and `Box3D.xml` are generated at build time and not committed to the repository. They are listed in `.gitignore`.
 
 > [!CAUTION]
-> `dotnet build` will not build native binaries. You must build them separately, or download them from GitHub Actions runs.
+> `dotnet build` will not build native binaries. You must build them separately, or download them from GitHub Actions runs. When packing, the native binaries are expected under `native/<platform>/`.
+
+### Build Box3D.LargeWorlds package
+
+Since `Box3D.LargeWorlds/Box3D.LargeWorlds.csproj` is a thin overlay that imports `Box3D.csproj` with two property overrides, the same build command works:
+
+```bash
+dotnet build Box3D.LargeWorlds
+```
+
+This generates the C# bindings with `-D BOX3D_DOUBLE_PRECISION` passed to ClangSharp, producing `NativeMethods.cs` with `double`-precision types and the matching `DllImport` entry points. When packing, the native binaries are expected under `native/large-worlds/<platform>/`.
 
 ### Rebuild native libraries (optional)
 
@@ -346,7 +344,7 @@ If you need to rebuild the native shared libraries for your platform instead of 
 ```bash
 # Linux/macOS
 cd box3d
-cmake --preset linux-release   # or: macos
+cmake --preset linux-release # or: macos
 cmake --build --preset linux-release
 ```
 
