@@ -372,7 +372,7 @@ PreprocessHeaders  →  GenerateNativeBindings  →  PostProcessNativeMethods  �
 | Preprocess headers | `Scripts/StageHeaders.cs` | Copies `.h` files to `obj/`, rewrites `B3_LITERAL` compound literals and injects assertion macro stubs so ClangSharp can parse them |
 | Generate bindings | ClangSharpPInvokeGenerator | Produces `NativeMethods.cs` with P/Invoke declarations and inline function bodies |
 | Post-process | `Scripts/PostProcessNativeMethods.cs` | Remaps C math functions to `System.MathF`, fixes boolean comparisons |
-| Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` (or `Box3D.LargeWorlds.xml`) for IntelliSense |
+| Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` for IntelliSense |
 
 ### Dual-package architecture
 
@@ -429,6 +429,8 @@ dotnet build  # verify bindings regenerate cleanly
 git add box3d
 git commit -m "Update box3d to <upstream commit>"
 ```
+
+---
 
 ## Contributing
 
