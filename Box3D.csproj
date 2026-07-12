@@ -40,7 +40,7 @@
     </PropertyGroup>
 
     <!-- Derive PackageReleaseNotes from the last git commit message -->
-    <Exec Command="git log -1 --format=%s"
+    <Exec Command="git log -1 --format=%B"
           ConsoleToMSBuild="true">
       <Output TaskParameter="ConsoleOutput" PropertyName="PackageReleaseNotes" />
     </Exec>
