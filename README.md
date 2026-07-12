@@ -421,6 +421,15 @@ Runs daily at 06:00 UTC to check for new commits in the upstream `erincatto/box3
 
 This ensures the C# bindings track the latest Box3D release without manual intervention.
 
+If you want to update it manually:
+
+```bash
+git submodule update --remote box3d
+dotnet build  # verify bindings regenerate cleanly
+git add box3d
+git commit -m "Update box3d to <upstream commit>"
+```
+
 ## Contributing
 
 This repository wraps the upstream Box3D engine. Bug reports and feature requests related to the **C# bindings or NuGet packaging** should be filed at [Happypig375/Box3D issues](https://github.com/Happypig375/Box3D/issues).
@@ -428,17 +437,6 @@ This repository wraps the upstream Box3D engine. Bug reports and feature request
 Issues related to the **physics engine itself** (collision, solver, joints, etc.) should be filed upstream at [erincatto/box3d issues](https://github.com/erincatto/box3d/issues).
 
 For questions or support, join [Box3D Discord](https://discord.gg/NKYgCBP).
-
-### Submodule update workflow
-
-The `box3d` submodule is updated automatically by the daily [`update.yml`](.github/workflows/update.yml) workflow. To update it manually:
-
-```bash
-git submodule update --remote box3d
-dotnet build   # verify bindings regenerate cleanly
-git add box3d
-git commit -m "Update box3d to <upstream commit>"
-```
 
 ---
 
