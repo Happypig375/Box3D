@@ -38,21 +38,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup JDK
-        if: contains(matrix.platform.name, 'android')
-        uses: actions/setup-java@v5
-        with:
-          distribution: microsoft
-          java-version: 21
-      - name: Install Android SDK Manager
-        if: contains(matrix.platform.name, 'android')
-        uses: android-actions/setup-android@v4
-      - name: Install Android SDK
-        if: contains(matrix.platform.name, 'android')
-        run: |
-          sdkmanager --install "platforms;android-$ANDROID_PLATFORM_VER"
-          sdkmanager --install "ndk;$ANDROID_NDK_VER"
-
       - name: Build
         shell: bash
         env:
