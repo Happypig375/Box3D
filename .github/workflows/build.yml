@@ -128,35 +128,11 @@ jobs:
         with:
           dotnet-version: 11.x
           dotnet-quality: preview # needed for net11.0
-
-      # Mobile workloads
-      - name: Install Android workload
-        if: contains(matrix.platform.name, 'android')
-        run: dotnet workload install android
-      - name: Install iOS workload
-        if: contains(matrix.platform.name, 'ios')
-        run: dotnet workload install ios
-      - name: Install tvOS workload
-        if: contains(matrix.platform.name, 'tvos')
-        run: dotnet workload install tvos
-      - name: Install Mac Catalyst workload
-        if: contains(matrix.platform.name, 'maccatalyst')
-        run: dotnet workload install maccatalyst
-
-      # Android SDK
-      - name: Setup JDK
-        if: contains(matrix.platform.name, 'android')
-        uses: actions/setup-java@v5
-        with:
-          distribution: microsoft
-          java-version: 21
-      - name: Install Android SDK Manager
-        if: contains(matrix.platform.name, 'android')
-        uses: android-actions/setup-android@v4
-      - name: Install Android SDK
-        if: contains(matrix.platform.name, 'android')
-        run: |
-          sdkmanager --install "platforms;android-$ANDROID_PLATFORM_VER"
+          workloads:
+            ${{ contains(matrix.platform.name, 'android') && 'android' ||
+                contains(matrix.platform.name, 'ios') && 'ios' ||
+                contains(matrix.platform.name, 'tvos') && 'tvos' ||
+                contains(matrix.platform.name, 'maccatalyst') && 'maccatalyst' }}
 
       # Apple syncs version numbers across iOS, tvOS, macOS, and Xcode; e.g. the
       # .NET iOS workload version matches: 26.5.10284 → iOS 26.5 → Xcode 26.5.
@@ -214,8 +190,7 @@ jobs:
       # For Android: start emulator and run validation inside its script parameter
       - name: Enable KVM # Speeds up emulator startup time from 15 minutes to 2.5 minutes
         if: "!matrix.platform.build-only && contains(matrix.platform.name, 'android')"
-        run: |
-          sudo chown $USER /dev/kvm || echo "KVM not accessible"
+        run: sudo chown $USER /dev/kvm || echo "KVM not accessible"
       - name: Validate on Android emulator
         if: "!matrix.platform.build-only && contains(matrix.platform.name, 'android')"
         uses: reactivecircus/android-emulator-runner@v2
@@ -228,11 +203,7 @@ jobs:
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           working-directory: Test # Don't do cd in script as it's executed in a new bash every line
-          script: >-
-            dotnet run
-            -p TargetFrameworks="${{ matrix.platform.tfm }}"
-            -r "${{ matrix.platform.name }}"
-            ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
+          script: dotnet run -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}" ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
@@ -291,14 +262,12 @@ jobs:
           pattern: '*.nupkg'
           merge-multiple: true
           path: ./artifacts
-      # Get a short-lived NuGet API key via GitHub OIDC
-      - name: NuGet login
+      - name: NuGet login # Get a short-lived NuGet API key via GitHub OIDC
         continue-on-error: true
         uses: NuGet/login@v1
         id: login
         with:
           user: Happypig375
-      # Push the package
       - name: NuGet push
         continue-on-error: true
         run: dotnet nuget push artifacts/*.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
