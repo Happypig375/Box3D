@@ -2,15 +2,15 @@
 
 <p align="center"><b>C# bindings for <a href="https://github.com/erincatto/box3d">Box3D</a></b> — Erin Catto's 3D rigid body physics engine for games.</p>
 
-[![NuGet](https://img.shields.io/nuget/v/Box3D.svg?label=NuGet%3A%20Box3D)](https://www.nuget.org/packages/Box3D)
-[![NuGet](https://img.shields.io/nuget/v/Box3D.LargeWorlds.svg?label=NuGet%3A%20Box3D.LargeWorlds)](https://www.nuget.org/packages/Box3D.LargeWorlds)
+[![NuGet: Box3D](https://img.shields.io/nuget/v/Box3D.svg?label=NuGet%3A%20Box3D)](https://www.nuget.org/packages/Box3D)
+[![NuGet: Box3D.LargeWorlds](https://img.shields.io/nuget/v/Box3D.LargeWorlds.svg?label=NuGet%3A%20Box3D.LargeWorlds)](https://www.nuget.org/packages/Box3D.LargeWorlds)
 [![Build Status](https://github.com/Happypig375/Box3D/actions/workflows/build.yml/badge.svg)](https://github.com/Happypig375/Box3D/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
 Two NuGet packages provide .NET bindings and prebuilt native binaries for the Box3D C library, so you can use a high-performance 3D physics engine from C# without compiling any C code yourself: **Box3D** (single-precision) and **Box3D.LargeWorlds** (double-precision for simulations spanning 100 km+). The native libraries are built for **12 platforms &times; 2 precisions** and work out of the box on desktop, mobile, and web.
 
 > [!IMPORTANT]
-> This is the C# wrapper repository. The physics engine itself is developed by Erin Catto at [erincatto/box3d](https://github.com/erincatto/box3d) and is included here as a git submodule. For physics documentation, tutorials, and the C API reference, refer to [Box3D documentation](https://box2d.org/documentation3d).
+> This is the C# wrapper repository. The physics engine itself is developed by Erin Catto at [erincatto/box3d](https://github.com/erincatto/box3d) and is included here as a git submodule. For physics documentation, tutorials, and the C API reference, refer to [Box3D documentation](https://box2d.org/documentation3d). For questions or support, [![join Box3D Discord here.](https://img.shields.io/badge/join_Box3D_Discord_here.-%235865F2.svg?&logo=discord&logoColor=white)](https://discord.gg/NKYgCBP)
 
 ---
 
@@ -140,13 +140,13 @@ Both NuGet packages ship native binaries for the following runtimes — no addit
 | tvOS (device) | `tvos-arm64` | `box3d.framework` |
 | tvOS Simulator | `tvossimulator-arm64` | `box3d.framework` |
 | Mac Catalyst | `maccatalyst-arm64` | `box3d.framework` |
-| Android ARM64 | `android-arm64` | `libbox3d.so` |
 | Android x64 | `android-x64` | `libbox3d.so` |
+| Android ARM64 | `android-arm64` | `libbox3d.so` |
 
 The correct binary is loaded automatically at runtime via NuGet's RID-based `runtimes/<rid>/native/` convention.
 
 > [!WARNING]
-> For iOS/tvOS/Android/Mac Catalyst, only .NET 11+ is supported. For .NET 10 Android, using `<UseMonoRuntime>false</UseMonoRuntime>` property is also supported.
+> For iOS/tvOS/Mac Catalyst/Android, only .NET 11+ is supported. For .NET 10 Android, using `<UseMonoRuntime>false</UseMonoRuntime>` property is also supported.
 
 This is because the CoreCLR runtime must be used. Otherwise, the Mono runtime will crash on any invocation of `b3DefaultWorldDef()` because it does not support function pointer fields in struct return types during P/Invoke. This also means we cannot support browser WASM until it migrates to CoreCLR, to be expected for .NET 12.
 
@@ -402,10 +402,10 @@ The build matrix has two dimensions: `large-worlds` (empty for single-precision,
 - **Windows** (x64, ARM64) — MSVC, static CRT
 - **Linux** (x64, ARM64) — Ninja
 - **macOS** (ARM64) — Ninja
-- **Android** (ARM64, x64) — Android NDK
 - **iOS** (ARM64 device, ARM64 simulator) — Xcode with framework packaging
 - **tvOS** (ARM64 device, ARM64 simulator) — Xcode with framework packaging
 - **Mac Catalyst** (ARM64) — Unix makefiles with framework packaging
+- **Android** (ARM64, x64) — Android NDK
 
 Each precision&ndash;platform combination runs the single `build-native.sh` script, which handles Android, iOS, and desktop builds in a single code path. The resulting binaries are compressed and uploaded as named artifacts (`native-{large-worlds}-{platform}.tar`).
 
@@ -428,6 +428,8 @@ This ensures the C# bindings track the latest Box3D release without manual inter
 This repository wraps the upstream Box3D engine. Bug reports and feature requests related to the **C# bindings or NuGet packaging** should be filed at [Happypig375/Box3D issues](https://github.com/Happypig375/Box3D/issues).
 
 Issues related to the **physics engine itself** (collision, solver, joints, etc.) should be filed upstream at [erincatto/box3d issues](https://github.com/erincatto/box3d/issues).
+
+For questions or support, join [Box3D Discord](https://discord.gg/NKYgCBP).
 
 ### Submodule update workflow
 
