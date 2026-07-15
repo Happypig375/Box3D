@@ -27,8 +27,7 @@
           Condition="$([System.OperatingSystem]::IsWindows())">
       <Output TaskParameter="ConsoleOutput" PropertyName="Version" />
     </Exec>
-    <!-- On non-Windows, use grep -->
-    <Exec Command="grep -oP 'VERSION \K\d+\.\d+\.\d+' '$(MSBuildThisFileDirectory)box3d/CMakeLists.txt'"
+    <Exec Command="perl -nle 'print $1 if /VERSION (\d+\.\d+\.\d+)/' '$(MSBuildThisFileDirectory)box3d/CMakeLists.txt'"
           ConsoleToMSBuild="true"
           Condition="!$([System.OperatingSystem]::IsWindows())">
       <Output TaskParameter="ConsoleOutput" PropertyName="Version" />
