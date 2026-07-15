@@ -188,6 +188,11 @@ jobs:
         shell: bash
         run: |
           cd Test
+          if [ -n "$MD_APPLE_SDK_ROOT" ]; then
+            # maxim-lobanov/setup-xcode@v1 sets the deprecated MD_APPLE_SDK_ROOT environment variable,
+            # but .NET for iOS uses DEVELOPER_DIR instead. see https://github.com/maxim-lobanov/setup-xcode/pull/63
+            DEVELOPER_DIR=$MD_APPLE_SDK_ROOT/Contents/Developer
+          fi
           if [[ "${{ matrix.platform.name }}" == *simulator-arm64 ]]; then
             PLATFORM="${{ matrix.platform.name }}"
             SIM_OS="${PLATFORM%simulator-arm64}" # "ios" or "tvos"
