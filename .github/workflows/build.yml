@@ -192,11 +192,13 @@ jobs:
             PLATFORM="${{ matrix.platform.name }}"
             SIM_OS="${PLATFORM%simulator-arm64}" # "ios" or "tvos"
             SIM_OS="${SIM_OS%os}OS"              # "iOS" or "tvOS"
+            echo "=== Using simulator OS: $SIM_OS ==="
             # Find the highest available iOS/tvOS runtime instead of using the Xcode version
             # (iOS SDK version may lag behind Xcode version, e.g. Xcode 26.6 has iOS 26.5)
             SIM_RUNTIME=$(xcrun simctl list devices | awk -v os="$SIM_OS" '/^-- /{if ($2 == os && $3 > max) max = $3} END{print max}')
-            UDID=$(xcrun simctl list devices | awk -v os="$SIM_OS" -v ver="$SIM_RUNTIME" "/^-- $os $ver --/{flag=1;next}/^--/{flag=0}flag" | grep -m1 -oE '[0-9A-F-]{36}')
-            echo "=== Using simulator UDID: $UDID (runs $SIM_OS $SIM_RUNTIME) ==="
+            echo "=== Using $SIM_OS $SIM_RUNTIME ==="
+            UDID=$(xcrun simctl list devices | awk "/^-- $SIM_OS $SIM_RUNTIME --/{flag=1;next}/^--/{flag=0}flag" | grep -m1 -oE '[0-9A-F-]{36}')
+            echo "=== Using simulator UDID: $UDID ==="
             dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID ${{ matrix.large-worlds && '-p:LargeWorlds=true' }} \
                 -p SupportedOSPlatformVersion=${{ contains(matrix.platform.name, 'ios') && '26.0' || '16.1' }} # work around https://github.com/dotnet/macios/pull/25975 until it's released
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
