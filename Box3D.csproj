@@ -39,11 +39,22 @@
       <PackageVersion>$(Version).$([System.DateTime]::UtcNow.ToString('yyyyMMdd'))</PackageVersion>
     </PropertyGroup>
 
-    <!-- Derive PackageReleaseNotes from the last git commit message -->
+    <!-- Derive PackageReleaseNotes from the last git commit body -->
     <Exec Command="git log -1 --format=%B"
-          ConsoleToMSBuild="true">
-      <Output TaskParameter="ConsoleOutput" PropertyName="PackageReleaseNotes" />
+          ConsoleToMSBuild="true"
+          Condition="!$([System.OperatingSystem]::IsWindows())">
+      <Output TaskParameter="ConsoleOutput" ItemName="_PackageReleaseNotesLines" />
     </Exec>
+    <!-- On Windows, % will be interpreted as an environment variable, so we need to escape it. -->
+    <Exec Command="git log -1 --format=%%B"
+          ConsoleToMSBuild="true"
+          Condition="$([System.OperatingSystem]::IsWindows())">
+      <Output TaskParameter="ConsoleOutput" ItemName="_PackageReleaseNotesLines" />
+    </Exec>
+    <PropertyGroup>
+      <!-- Join line items together with newline characters -->
+      <PackageReleaseNotes>@(_PackageReleaseNotesLines, '%0a')</PackageReleaseNotes>
+    </PropertyGroup>
   </Target>
 
   <!-- Native binaries for NuGet package (download from GitHub Actions) -->
