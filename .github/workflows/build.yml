@@ -145,7 +145,8 @@ jobs:
           # This property is more reliable than trying to derive the Xcode version from the workload version number, since the mapping is
           # not always 1:1 (e.g. iOS 26.5 → Xcode 26.6), see https://github.com/dotnet/macios/issues/25818
           XCODE_VERSION=$(dotnet build -getProperty:_RecommendedXcodeVersion -f ${{ matrix.platform.tfm }} 2>/dev/null)
-          XCODE_VERSION=${XCODE_VERSION%.*} # Strip any patch component, keep major.minor
+          echo "Recommended Xcode version for ${{ matrix.platform.tfm }} is $XCODE_VERSION"
+          XCODE_VERSION=$(echo "$XCODE_VERSION" | cut -d. -f1-2) # Keep only major.minor
           echo "xcode-version=${XCODE_VERSION:-latest-stable}" >> "$GITHUB_OUTPUT"
       - uses: maxim-lobanov/setup-xcode@v1
         if: contains(matrix.platform.name, 'ios') || contains(matrix.platform.name, 'tvos') || contains(matrix.platform.name, 'maccatalyst')
@@ -192,6 +193,7 @@ jobs:
             SIM_OS="${PLATFORM%simulator-arm64}"   # "ios" or "tvos"
             SIM_OS="${SIM_OS%os}OS"                # "iOS" or "tvOS"
             UDID=$(xcrun simctl list devices | awk "/-- $SIM_OS ${{ steps.ios-version.outputs.xcode-version }} --/{flag=1;next}/--/{flag=0}flag" | grep -m1 -oE '[0-9A-F-]{36}')
+            echo "=== Using simulator UDID: $UDID ==="
             dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID ${{ matrix.large-worlds && '-p:LargeWorlds=true' }} \
                 -p SupportedOSPlatformVersion=${{ contains(matrix.platform.name, 'ios') && '26.0' || '16.1' }} # work around https://github.com/dotnet/macios/pull/25975 until it's released
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
