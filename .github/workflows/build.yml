@@ -190,8 +190,8 @@ jobs:
           cd Test
           if [[ "${{ matrix.platform.name }}" == *simulator-arm64 ]]; then
             PLATFORM="${{ matrix.platform.name }}"
-            SIM_OS="${PLATFORM%simulator-arm64}"   : "ios" or "tvos"
-            SIM_OS="${SIM_OS%os}OS"                : "iOS" or "tvOS"
+            SIM_OS="${PLATFORM%simulator-arm64}" ;: "ios" or "tvos"
+            SIM_OS="${SIM_OS%os}OS"              ;: "iOS" or "tvOS"
             UDID=$(xcrun simctl list devices | awk "/-- $SIM_OS ${{ steps.ios-version.outputs.xcode-version }} --/{flag=1;next}/--/{flag=0}flag" | grep -m1 -oE '[0-9A-F-]{36}')
             echo "=== Using simulator UDID: $UDID ==="
             dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID ${{ matrix.large-worlds && '-p:LargeWorlds=true' }} \
