@@ -36,15 +36,6 @@ static class PostProcessor
     public static string PostProcessCSharp(string content)
     {
         // Step 1: Math function remapping (fully qualified to avoid missing using)
-        content = Regex.Replace(content, @"\bsqrtf\s*\(", "System.MathF.Sqrt(");
-        content = Regex.Replace(content, @"\bremainderf\s*\(", "System.MathF.IEEERemainder(");
-        content = Regex.Replace(content, @"\bfabsf\s*\(", "System.MathF.Abs(");
-        content = Regex.Replace(content, @"\bnextafterf\s*\(\s*(\w+)\s*,\s*(-?)3\.4028234\d*[eE]\+38[fF]\)", match =>
-        {
-            var arg1 = match.Groups[1].Value;
-            var arg2 = match.Groups[2].Value;
-            return arg2.StartsWith("-") ? $"System.MathF.BitDecrement({arg1})" : $"System.MathF.BitIncrement({arg1})";
-        });
 
         // Step 2: Fix bool != 0 / bool == 0
         content = FixBoolComparisons(content);

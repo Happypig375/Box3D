@@ -95,18 +95,16 @@
 
     <!-- Build the ClangSharp response file lines -->
     <ItemGroup>
+      <!-- input headers -->
       <_RspCsLines Include="-f;%(CHeader.Identity)" />
-      <_RspCsLines Include="-n;Box3D;-m;Box3D;-o;NativeMethods.cs;-l;box3d;-x;c" />
-      <_RspCsLines Include="-c;latest-codegen;-c;generate-disable-runtime-marshalling;-c;generate-doc-includes" />
+      <!-- architectural settings (namespace name, method class name, DllImport path, output file) -->
+      <_RspCsLines Include="-n;Box3D;-m;Box3D;-l;box3d;-o;NativeMethods.cs" />
+      <!-- codegen settings (header language, codegen config, codegen flags) -->
+      <_RspCsLines Include="-x;c;-c;codegen=latest;-g;disable-runtime-marshalling;doc-includes;helper-types;file-scoped-namespaces" />
+      <!-- function remappings -->
+      <_RspCsLines Include="-r;sqrtf=System.MathF.Sqrt;remainderf=System.MathF.IEEERemainder;absf=System.MathF.Abs" />
       <!-- Precision-specific defines from Box3D.LargeWorlds -->
       <_RspCsLines Include="$(Box3DClangDefines)" Condition="'$(Box3DClangDefines)' != ''" />
-      <!--
-        On Unix systems, the NuGet's libclang.so lacks its resource directory (built-in headers
-        like <stdbool.h>, <stdint.h>). The CI workflow installs system clang headers and
-        sets CLANG_RESOURCE_DIR to the installed resource root. Pass it as -resource-dir.
-      -->
-      <_RspCsLines Condition="'$(CLANG_RESOURCE_DIR)' != ''"
-                   Include="-a;-resource-dir;-a;$(CLANG_RESOURCE_DIR)" />
     </ItemGroup>
     <WriteLinesToFile File="$(IntermediateOutputPath)generate_cs.rsp"
                       Lines="@(_RspCsLines)"
@@ -114,8 +112,7 @@
     <Exec Command="dotnet ClangSharpPInvokeGenerator @$(IntermediateOutputPath)generate_cs.rsp" />
     <ItemGroup>
       <Compile Include="NativeMethods.cs" />
-      <Compile Include="$(MSBuildThisFileDirectory)NativeTypeNameAttribute.cs" />
-      <Compile Include="$(MSBuildThisFileDirectory)iOSWorkaround.cs" />
+      <Compile Include="$(MSBuildThisFileDirectory)Helpers.cs" />
     </ItemGroup>
   </Target>
 
