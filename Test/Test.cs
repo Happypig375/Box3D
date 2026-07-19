@@ -32,6 +32,52 @@ static class Program
 	{
         Console.WriteLine("Starting test...");
 
+		// === Validate correct native binary is loaded ===
+		// Register assert callback first.
+		b3SetAssertFcn(&AssertCallback);
+
+		// Trigger a controlled assert: b3SetAssertFcn(null) calls
+		// B3_ASSERT(assertFcn != NULL) inside the library.
+		// In Debug native binary, this calls our callback.
+		// In Release native binary, B3_ASSERT is stripped.
+		s_assertFiredCount = 0;
+		b3SetAssertFcn(null);
+		b3SetAssertFcn(&AssertCallback); // re-register the real callback
+
+#if DEBUG
+		if (s_assertFiredCount != 1)
+		{
+			Console.Error.WriteLine($"ERROR: Expected native assert to fire once in Debug build but {s_assertFiredCount} fired");
+			return 3001;
+		}
+		Console.WriteLine($"Debug native binary verified: one assert fired");
+#else
+		if (s_assertFiredCount > 0)
+		{
+			Console.Error.WriteLine("ERROR: Unexpected assert in Release build");
+			return 3002;
+		}
+		Console.WriteLine("Release native binary verified: asserts stripped");
+#endif
+
+		// === Validate that the other configuration binary is unreachable ===
+		#if DEBUG
+		var suffix = "";
+		#else
+		var suffix = "d";
+		#endif
+		var libName =
+			OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst()
+			? $"@rpath/box3d{suffix}.framework/box3d{suffix}"
+			: $"box3d{suffix}";
+		if (NativeLibrary.TryLoad(libName, out IntPtr handle))
+		{
+			Console.WriteLine("Box3D.targets failed to filter native binaries!");
+		    return 3003;
+		}
+
+		// === Create a world and run a simulation ===
+
 		// Construct a world object, which will hold and simulate the rigid bodies.
 		b3WorldDef worldDef = b3DefaultWorldDef();
 		worldDef.gravity = new b3Vec3 { x = 0.0f, y = -10.0f, z = 0.0f };
@@ -42,7 +88,7 @@ static class Program
 		b3WorldId worldId = b3CreateWorld( &worldDef );
 #endif
 		if ( !b3World_IsValid( worldId ) )
-			return 3001;
+			return 3901;
 
 		// Define the ground body.
 		b3BodyDef groundBodyDef = b3DefaultBodyDef();
@@ -57,7 +103,7 @@ static class Program
 		// The body is also added to the world.
 		b3BodyId groundId = b3CreateBody( worldId, &groundBodyDef );
 		if ( !b3Body_IsValid( groundId ) )
-			return 3002;
+			return 3902;
 
 		// Define the ground box shape. The extents are the half-widths of the box.
 		b3BoxHull groundBox = b3MakeBoxHull( 50.0f, 10.0f, 50.0f );
@@ -128,52 +174,11 @@ static class Program
 #else
 		if ( Math.Abs( position.y - 1.00f ) > 0.01f )
 #endif
-			return 3003;
+			return 3903;
 		if ( Math.Abs( rotation.v.x ) > 0.01f )
-			return 3004;
+			return 3904;
 		if ( Math.Abs( rotation.v.z ) > 0.01f )
-			return 3005;
-
-		// === Validate correct native binary is loaded ===
-		// Register assert callback first.
-		b3SetAssertFcn(&AssertCallback);
-
-		// Trigger a controlled assert: b3SetAssertFcn(null) calls
-		// B3_ASSERT(assertFcn != NULL) inside the library.
-		// In Debug native binary, this calls our callback.
-		// In Release native binary, B3_ASSERT is stripped.
-		s_assertFiredCount = 0;
-		b3SetAssertFcn(null);
-		b3SetAssertFcn(&AssertCallback); // re-register the real callback
-
-#if DEBUG
-		if (s_assertFiredCount != 1)
-		{
-			Console.Error.WriteLine($"ERROR: Expected native assert to fire once in Debug build but {s_assertFiredCount} fired");
-			return 3101;
-		}
-		Console.WriteLine($"Debug native binary verified: one assert fired");
-#else
-		if (s_assertFiredCount > 0)
-		{
-			Console.Error.WriteLine("ERROR: Unexpected assert in Release build");
-			return 3102;
-		}
-		Console.WriteLine("Release native binary verified: asserts stripped");
-#endif
-
-		// === Validate that the other configuration binary is unreachable ===
-		#if DEBUG
-		var suffix = "";
-		#else
-		var suffix = "d";
-		#endif
-		var libName =
-			OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst()
-			? $"@rpath/box3d{suffix}.framework/box3d{suffix}"
-			: $"box3d{suffix}";
-		if (NativeLibrary.TryLoad(libName, out IntPtr handle))
-		    return 3103; // Box3D.targets has a bug if this happens
+			return 3905;
 
         Console.WriteLine("Test succeeded.");
 		return 0;

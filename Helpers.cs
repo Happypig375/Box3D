@@ -20,7 +20,7 @@ namespace Box3D
                     return NativeLibrary.Load($"@rpath/box3d{suffix}.framework/box3d{suffix}");
 
                 // Desktop / Android
-                return NativeLibrary.TryLoad($"box3d{suffix}");
+                return NativeLibrary.Load($"box3d{suffix}");
             });
 
             // Route native B3_ASSERT to C# Trace.Assert so asserts are visible
