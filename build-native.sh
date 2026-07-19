@@ -13,6 +13,7 @@
 #   FLAGS      - additional CMake flags
 #   LARGE_WORLDS  - non-empty to enable BOX3D_DOUBLE_PRECISION (large worlds)
 #   BUILD_TYPE - CMake build type (default: Release)
+#   BOX3D_VALIDATE - ON to enable BOX3D_VALIDATE (default: OFF, set to ON for Debug builds)
 #   Android-only:
 #     ANDROID_ABI, ANDROID_NDK_VER, ANDROID_PLATFORM_VER
 set -eu
@@ -27,7 +28,22 @@ echo "BUILD_TYPE: ${BUILD_TYPE:-Release}"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
+# Use a separate build directory for Debug to avoid conflicts with Release
+if [[ "${BUILD_TYPE}" == "Debug" ]]; then
+  BUILD_DIR="build-debug"
+else
+  BUILD_DIR="build"
+fi
+
 # Precision suffix for output directory
+# Validation flag (OFF by default, ON for Debug builds when explicitly set)
+BOX3D_VALIDATE="${BOX3D_VALIDATE:-OFF}"
+if [[ "${BOX3D_VALIDATE}" == "ON" ]]; then
+  VALIDATION_FLAG="-DBOX3D_VALIDATE=ON"
+else
+  VALIDATION_FLAG="-DBOX3D_VALIDATE=OFF"
+fi
+
 if [[ ${LARGE_WORLDS:-} ]]; then
   PRECISION_SUFFIX="/large-worlds"
   PRECISION_FLAG="-DBOX3D_DOUBLE_PRECISION=ON"
@@ -53,7 +69,7 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
     # Mac Catalyst: Unix Makefiles with explicit target triple.
     # The Xcode generator always produces iOS binaries regardless of overrides.
     SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-    cmake -S box3d -B build \
+    cmake -S box3d -B ${BUILD_DIR} \
       -G "Unix Makefiles" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
@@ -66,11 +82,11 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi -Wl,-install_name,@rpath/box3d.framework/box3d" \
       -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
       ${PRECISION_FLAG} \
+      ${VALIDATION_FLAG} \
       -DBUILD_SHARED_LIBS=ON \
       -DBOX3D_SAMPLES=OFF \
-      -DBOX3D_UNIT_TESTS=OFF \
-      -DBOX3D_VALIDATE=OFF
-    cmake --build build --config "${BUILD_TYPE}"
+      -DBOX3D_UNIT_TESTS=OFF
+    cmake --build ${BUILD_DIR} --config "${BUILD_TYPE}"
   else
     # iOS / iOS Simulator / tvOS / tvOS Simulator: Xcode generator
     APPLE_SDK_NAME="iOS"
@@ -83,28 +99,28 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       APPLE_SDK_NAME="tvOS"
       SIMULATOR_FLAG="-DCMAKE_OSX_SYSROOT=appletvsimulator"
     fi
-    cmake -S box3d -B build \
+    cmake -S box3d -B ${BUILD_DIR} \
       -GXcode \
       -DCMAKE_SYSTEM_NAME="${APPLE_SDK_NAME}" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       ${SIMULATOR_FLAG} \
       ${PRECISION_FLAG} \
+      ${VALIDATION_FLAG} \
       -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-install_name,@rpath/box3d.framework/box3d \
       -DBUILD_SHARED_LIBS=ON \
       -DBOX3D_SAMPLES=OFF \
-      -DBOX3D_UNIT_TESTS=OFF \
-      -DBOX3D_VALIDATE=OFF
-    cmake --build build --config "${BUILD_TYPE}" -- CODE_SIGNING_ALLOWED=NO
+      -DBOX3D_UNIT_TESTS=OFF
+    cmake --build ${BUILD_DIR} --config "${BUILD_TYPE}" -- CODE_SIGNING_ALLOWED=NO
   fi
 
   # Create .framework bundle (required by Apple platforms)
   echo "--- Creating framework ---"
   mkdir -p "${OUTPUT_DIR}/box3d.framework"
-  if [ -f "build/bin/${BUILD_TYPE}/libbox3d.dylib" ]; then
-    cp "build/bin/${BUILD_TYPE}/libbox3d.dylib" "${OUTPUT_DIR}/box3d.framework/box3d"
+  if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d.dylib" ]; then
+    cp "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d.dylib" "${OUTPUT_DIR}/box3d.framework/box3d"
   else
-    cp "build/bin/libbox3d.dylib" "${OUTPUT_DIR}/box3d.framework/box3d"
+    cp "${BUILD_DIR}/bin/libbox3d.dylib" "${OUTPUT_DIR}/box3d.framework/box3d"
   fi
   cat > "${OUTPUT_DIR}/box3d.framework/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -139,7 +155,7 @@ EOF
 else
   echo "--- Building for ${NAME} ---"
 
-  CMAKE_FLAGS="-DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_VALIDATE=OFF"
+  CMAKE_FLAGS="-DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF ${VALIDATION_FLAG}"
 
   if [[ "${NAME}" == android-* ]]; then
     # Android cross-compilation via NDK
@@ -147,28 +163,28 @@ else
     CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN} -DANDROID_ABI=${ANDROID_ABI} -DANDROID_PLATFORM=android-${ANDROID_PLATFORM_VER} -DANDROID_STL=c++_static"
   fi
 
-  cmake -S box3d -B build \
+  cmake -S box3d -B ${BUILD_DIR} \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
     -DBUILD_SHARED_LIBS=ON \
     ${PRECISION_FLAG} \
     ${FLAGS:-} \
     ${CMAKE_FLAGS}
 
-  cmake --build build --config "${BUILD_TYPE}"
+  cmake --build ${BUILD_DIR} --config "${BUILD_TYPE}"
 
   echo "--- Copying binaries ---"
   mkdir -p "${OUTPUT_DIR}"
 
   if [[ "${RUNNER_OS}" == "Windows" ]]; then
-    if [ -f "build/bin/${BUILD_TYPE}/box3d.dll" ]; then
-      cp "build/bin/${BUILD_TYPE}/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
+    if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d.dll" ]; then
+      cp "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
     else
-      cp "build/bin/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
+      cp "${BUILD_DIR}/bin/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
     fi
   elif [[ "${RUNNER_OS}" == "Linux" ]]; then
-    cp build/bin/libbox3d.so "${OUTPUT_DIR}/libbox3d.so"
+    cp ${BUILD_DIR}/bin/libbox3d.so "${OUTPUT_DIR}/libbox3d.so"
   elif [[ "${RUNNER_OS}" == "macOS" ]]; then
-    cp build/bin/libbox3d.dylib "${OUTPUT_DIR}/libbox3d.dylib"
+    cp ${BUILD_DIR}/bin/libbox3d.dylib "${OUTPUT_DIR}/libbox3d.dylib"
   fi
 fi
 

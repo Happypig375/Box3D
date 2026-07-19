@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    Box3D native binary selection for Debug vs Release consuming projects.
+
+    Both box3d (Release) and box3d_d (Debug) native binaries are delivered
+    in the NuGet package under runtimes/<rid>/native/, so the SDK's built-in
+    RID resolution automatically adds all matching files to NativeCopyLocalItems.
+
+    This .targets file:
+      1. Filters NativeCopyLocalItems to remove the Release (non-_d suffix) native binary
+         for Debug and the Debug (_d suffix) native binary for Release, so only the correct variant
+         is copied to the build output.
+      2. Sets the "Box3D.Debug" AppContext switch that Helpers.cs DllImportResolver
+         reads at runtime to load loads box3d_d in Debug and box3d in Release.
+  -->
+  <Target Name="_FilterBox3DNativeBinaries" AfterTargets="ResolvePackageAssets">
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And !$([System.String]::Copy('%(Filename)').EndsWith('_d'))" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And $([System.String]::Copy('%(Filename)').EndsWith('_d'))" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <RuntimeHostConfigurationOption Include="Box3D.Debug" Value="true" />
+  </ItemGroup>
+</Project>

@@ -3,6 +3,7 @@
 // All other packages resolve from nuget.org as usual.
 
 using System;
+using System.Runtime.InteropServices;
 using Box3D;
 using static Box3D.Box3D;
 
@@ -15,6 +16,18 @@ using static Box3D.Box3D;
 // with your rendering engine in your game engine.
 static class Program
 {
+	private static int s_assertFiredCount;
+
+	[UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+	private static unsafe int AssertCallback(sbyte* condition, sbyte* fileName, int lineNumber)
+	{
+		s_assertFiredCount++;
+		string condStr = Marshal.PtrToStringUTF8((nint)condition) ?? "(null)";
+		string fileStr = Marshal.PtrToStringUTF8((nint)fileName) ?? "(null)";
+		Console.WriteLine($"Native assert [{s_assertFiredCount}]: {condStr} at {fileStr}:{lineNumber}");
+		return 0; // prevent native __debugbreak()/__builtin_trap()
+	}
+
 	public static unsafe int Main()
 	{
         Console.WriteLine("Starting test...");
@@ -120,6 +133,34 @@ static class Program
 			return 3004;
 		if ( Math.Abs( rotation.v.z ) > 0.01f )
 			return 3005;
+
+		// === Validate correct native binary is loaded ===
+		// Register assert callback first.
+		b3SetAssertFcn(&AssertCallback);
+
+		// Trigger a controlled assert: b3SetAssertFcn(null) calls
+		// B3_ASSERT(assertFcn != NULL) inside the library.
+		// In Debug native binary, this calls our callback.
+		// In Release native binary, B3_ASSERT is stripped.
+		s_assertFiredCount = 0;
+		b3SetAssertFcn(null);
+		b3SetAssertFcn(&AssertCallback); // re-register the real callback
+
+#if DEBUG
+		if (s_assertFiredCount != 1)
+		{
+			Console.Error.WriteLine($"ERROR: Expected native assert to fire once in Debug build but {s_assertFiredCount} fired");
+			return 3101;
+		}
+		Console.WriteLine($"Debug native binary verified: one assert fired");
+#else
+		if (s_assertFiredCount > 0)
+		{
+			Console.Error.WriteLine("ERROR: Unexpected assert in Release build");
+			return 3102;
+		}
+		Console.WriteLine("Release native binary verified: asserts stripped");
+#endif
 
         Console.WriteLine("Test succeeded.");
 		return 0;

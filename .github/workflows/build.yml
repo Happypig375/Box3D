@@ -38,7 +38,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build
+      - name: Build (Release)
         shell: bash
         env:
           NAME: ${{ matrix.platform.name }}
@@ -46,7 +46,21 @@ jobs:
           FLAGS: ${{ matrix.platform.flags }}
           LARGE_WORLDS: ${{ matrix.large-worlds }}
           ANDROID_ABI: ${{ matrix.platform.abi }}
-          BUILD_TYPE: ${{ env.BUILD_TYPE }}
+          BUILD_TYPE: Release
+          ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
+          ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
+        run: ./build-native.sh
+
+      - name: Build (Debug)
+        shell: bash
+        env:
+          NAME: ${{ matrix.platform.name }}
+          RUNNER_OS: ${{ runner.os }}
+          FLAGS: ${{ matrix.platform.flags }}
+          LARGE_WORLDS: ${{ matrix.large-worlds }}
+          ANDROID_ABI: ${{ matrix.platform.abi }}
+          BUILD_TYPE: Debug
+          BOX3D_VALIDATE: ON # Note that we also enable all validation for Debug
           ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
           ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
         run: ./build-native.sh
@@ -100,7 +114,7 @@ jobs:
         run: cd Scripts && dotnet run DocCoverage.cs ${{ matrix.large-worlds && '-p DefineConstants=LARGE_WORLDS' }}
 
   validate:
-    name: Validate ${{ matrix.large-worlds && 'Box3D.LargeWorlds' || 'Box3D' }} on ${{ matrix.platform.name }}
+    name: Validate ${{ matrix.large-worlds && 'Box3D.LargeWorlds' || 'Box3D' }} ${{ matrix.config }} on ${{ matrix.platform.name }}
     runs-on: ${{ matrix.platform.os }}
     needs: pack-nuget
     strategy:
@@ -118,6 +132,7 @@ jobs:
           - { name: iossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-ios } # Building for ios-arm64 requires a real device so it's omitted
           - { name: tvossimulator-arm64, os: *macos-latest-dotnet-ios,  tfm: net11.0-tvos } # Building for tvos-arm64 requires a real device so it's omitted
           - { name: maccatalyst-arm64,  os: *macos-latest-dotnet-ios,  tfm: net11.0-maccatalyst }
+        config: [Debug, Release]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -162,7 +177,7 @@ jobs:
 
       - name: Validate build
         if: matrix.platform.build-only
-        run: cd Test && dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
+        run: cd Test && dotnet build -c ${{ matrix.config }} -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
       # For Android: start emulator and run validation inside its script parameter
       - name: Enable KVM # Speeds up emulator startup time from 15 minutes to 2.5 minutes
@@ -180,7 +195,7 @@ jobs:
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           working-directory: Test # Don't do cd in script as it's executed in a new bash every line
-          script: dotnet run -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}" ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
+          script: dotnet run -c ${{ matrix.config }} -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}" ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
@@ -212,7 +227,7 @@ jobs:
             xcrun simctl boot "$UDID" 2>/dev/null || true
             xcrun simctl bootstatus "$UDID"
             # Build the app (dotnet run --device requires mlaunch which is missing from .NET 11 preview workload packs)
-            dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }} \
+            dotnet build -c ${{ matrix.config }} -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }} \
                 -p SupportedOSPlatformVersion=${{ contains(matrix.platform.name, 'ios') && '26.0' || '16.1' }} # work around https://github.com/dotnet/macios/pull/25975 until it's released
             echo "=== Searching for .app bundle ==="
             APP_DIR=$(find /Users -path "*/bin/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
@@ -232,7 +247,7 @@ jobs:
               exit 1
             fi
           elif [[ "${{ matrix.platform.name }}" == "maccatalyst-arm64" ]]; then
-            dotnet build -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
+            dotnet build -c ${{ matrix.config }} -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
             echo "=== Searching for .app bundle ==="
             APP_DIR=$(find /Users -path "*/bin/*/Test.app" -type d -maxdepth 10 2>/dev/null | head -1)
             if [ -z "$APP_DIR" ]; then
@@ -259,7 +274,7 @@ jobs:
               exit 1
             fi
           else
-            dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
+            dotnet run -c ${{ matrix.config }} -p TargetFrameworks=${{ matrix.platform.tfm }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
           fi
 
   nuget-push:
