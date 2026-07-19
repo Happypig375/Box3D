@@ -74,6 +74,7 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
     SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
     cmake -S box3d -B ${BUILD_DIR} \
       -G "Unix Makefiles" \
+      -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_OSX_SYSROOT="$SDKROOT" \
