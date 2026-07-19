@@ -28,6 +28,9 @@ static class Program
 		return 0; // prevent native __debugbreak()/__builtin_trap()
 	}
 
+	[DllImport("kernel32", CharSet = CharSet.Unicode, ExactSpelling = true)]
+	private static extern int GetModuleFileName(nint hModule, System.Text.StringBuilder lpFilename, int nSize);
+
 	public static unsafe int Main()
 	{
         Console.WriteLine("Starting test...");
@@ -72,8 +75,16 @@ static class Program
 			: $"box3d{suffix}";
 		if (NativeLibrary.TryLoad(libName, out IntPtr handle))
 		{
-			Console.WriteLine("Box3D.targets failed to filter native binaries!");
-		    return 3003;
+			var path = "";
+			if (OperatingSystem.IsWindows())
+			{
+				var sb = new System.Text.StringBuilder(1024);
+				if (GetModuleFileName(handle, sb, sb.Capacity) > 0)
+					path = sb.ToString();
+			}
+			Console.WriteLine($"Box3D.targets failed to filter native binaries! Loaded from: '{path}'");
+			NativeLibrary.Free(handle);
+			return 3003;
 		}
 
 		// === Create a world and run a simulation ===

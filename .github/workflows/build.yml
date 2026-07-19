@@ -195,7 +195,11 @@ jobs:
           emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           working-directory: Test # Don't do cd in script as it's executed in a new bash every line
-          script: dotnet run -c ${{ matrix.config }} -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}" ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
+          script: |
+            # Export DOTNET_HOST_PATH so ILLink task host can find dotnet
+            export DOTNET_HOST_PATH="$(command -v dotnet)"
+            echo "DOTNET_HOST_PATH=$DOTNET_HOST_PATH"
+            dotnet run -c ${{ matrix.config }} -p TargetFrameworks="${{ matrix.platform.tfm }}" -r "${{ matrix.platform.name }}" ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
       # For all other platforms: run validation directly
       - name: Validate that the NuGet package works
@@ -240,7 +244,55 @@ jobs:
             echo "APP_DIR=$APP_DIR"
             if [ -n "$APP_DIR" ]; then
               xcrun simctl install "$UDID" "$APP_DIR"
-              xcrun simctl launch --console "$UDID" com.github.Happypig375.Box3D
+              echo "=== Launching app on simulator (60s timeout) ==="
+              # Run simctl with console output to a temp file for marker scanning
+              SIM_LOG=$(mktemp)
+              xcrun simctl launch --console "$UDID" com.github.Happypig375.Box3D > "$SIM_LOG" 2>&1 &
+              SIM_PID=$!
+              EXIT_CODE=""
+              # Wait for completion signal or timeout
+              for i in $(seq 1 60); do
+                if ! kill -0 $SIM_PID 2>/dev/null; then
+                  wait $SIM_PID
+                  EXIT_CODE=$?
+                  echo "=== Simulator process exited with code $EXIT_CODE ==="
+                  break
+                fi
+                if grep -q "Test succeeded." "$SIM_LOG" 2>/dev/null; then
+                  echo "=== Test succeeded marker found ==="
+                  break
+                fi
+                sleep 1
+              done
+              # If process still running after timeout, kill it
+              if kill -0 $SIM_PID 2>/dev/null; then
+                echo "=== Simulator timed out after 60s ===" >&2
+                kill $SIM_PID 2>/dev/null
+                wait $SIM_PID 2>/dev/null
+                EXIT_CODE=${EXIT_CODE:-1}
+              fi
+              # Get exit code if not already set (success marker found before process exit)
+              if [ -z "$EXIT_CODE" ]; then
+                wait $SIM_PID 2>/dev/null
+                EXIT_CODE=$?
+              fi
+              # Print full log
+              cat "$SIM_LOG"
+              # Scan log for crash/failure markers
+              if grep -qE "Unhandled exception|DllNotFoundException|Box3D.targets failed|Test succeeded." "$SIM_LOG" 2>/dev/null; then
+                if grep -q "Test succeeded." "$SIM_LOG" 2>/dev/null; then
+                  echo "=== Simulator validation PASSED ==="
+                  EXIT_CODE=0
+                else
+                  echo "=== Detected failure in simulator output ===" >&2
+                  EXIT_CODE=1
+                fi
+              fi
+              rm -f "$SIM_LOG"
+              if [ "$EXIT_CODE" -ne 0 ]; then
+                echo "Simulator validation failed" >&2
+                exit ${EXIT_CODE:-1}
+              fi
             else
               echo "Could not find .app bundle for $SIM_OS simulator" >&2
               ls -laR /Users/runner 2>/dev/null | head -40

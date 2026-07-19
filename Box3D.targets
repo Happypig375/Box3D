@@ -15,14 +15,46 @@
          reads at runtime to load box3dd in Debug and box3d in Release.
   -->
   <Target Name="_FilterBox3DNativeBinaries" AfterTargets="ResolvePackageAssets">
+    <!-- Diagnostic: set Box3DDiagnostic=true to log item metadata before/after filtering -->
+    <Warning Condition="'$(Box3DDiagnostic)' == 'true'"
+             Text="[_FilterBox3DNativeBinaries] Before: Configuration=$(Configuration)%0a%40(NativeCopyLocalItems, '%0a  Identity=%(Identity) NuGetPackageId=%(NuGetPackageId) DestinationSubPath=%(DestinationSubPath) DestinationSubDirectory=%(DestinationSubDirectory)')" />
     <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+      <!-- Remove non-Debug (box3d, without dd suffix) native binaries for the Box3D packages.
+           Check NuGetPackageId metadata first (SDK 10.x), then fall back to path-based matching (SDK 11+). -->
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')
+                   And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+        Condition="$([System.String]::Copy('%(Identity)').Contains('box3d'))
+                   And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))
+                   And ('%(NuGetPackageId)' == '' Or '%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')" />
     </ItemGroup>
     <ItemGroup Condition="'$(Configuration)' != 'Debug'">
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And $([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')
+                   And $([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+        Condition="$([System.String]::Copy('%(Identity)').Contains('box3dd'))
+                   And ('%(NuGetPackageId)' == '' Or '%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')" />
     </ItemGroup>
+    <Warning Condition="'$(Box3DDiagnostic)' == 'true'"
+             Text="[_FilterBox3DNativeBinaries] After: Configuration=$(Configuration)%0a%40(NativeCopyLocalItems, '%0a  Identity=%(Identity) NuGetPackageId=%(NuGetPackageId) DestinationSubPath=%(DestinationSubPath)')" />
+  </Target>
+  <!-- Second-stage filter: catch any native assets repopulated by later SDK targets (e.g., _CopyFilesMarkedCopyLocal) -->
+  <Target Name="_FilterBox3DNativeBinariesLate" AfterTargets="_CopyFilesMarkedCopyLocal"
+          Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' != 'Debug'">
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+        Condition="$([System.String]::Copy('%(Identity)').Contains('box3d')) And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)"
+        Condition="$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+    </ItemGroup>
+  </Target>
+  <Target Name="_DiagnoseBox3DCopyPipeline" AfterTargets="_CopyOutOfDateSourceItemsToOutputDirectory"
+          Condition="'$(Box3DDiagnostic)' == 'true'">
+    <Warning Text="[_DiagnoseBox3DCopyPipeline] FilesInOutput=%0a%40(AllItemsFullPathWithTargetPath, '%0a  Identity=%(Identity) TargetPath=%(TargetPath)')" />
   </Target>
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
     <RuntimeHostConfigurationOption Include="Box3D.Debug" Value="true" />
