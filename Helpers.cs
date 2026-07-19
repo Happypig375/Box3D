@@ -16,7 +16,7 @@ namespace Box3D
                     return IntPtr.Zero;
 
                 bool useDebug = AppContext.TryGetSwitch("Box3D.Debug", out bool debug) && debug; // Set in Box3D.targets
-                string suffix = useDebug ? "_d" : "";
+                string suffix = useDebug ? "d" : "";
 
                 // Apple framework path with debug suffix - see https://github.com/dotnet/macios/issues/21238
                 if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst())

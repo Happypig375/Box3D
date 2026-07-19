@@ -29,10 +29,13 @@ echo "BUILD_TYPE: ${BUILD_TYPE:-Release}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
 # Use a separate build directory for Debug to avoid conflicts with Release
+# Library suffix matching CMAKE_DEBUG_POSTFIX in box3d/src/CMakeLists.txt ("d")
 if [[ "${BUILD_TYPE}" == "Debug" ]]; then
   BUILD_DIR="build-debug"
+  LIB_SUFFIX="d"
 else
   BUILD_DIR="build"
+  LIB_SUFFIX=""
 fi
 
 # Precision suffix for output directory
@@ -79,7 +82,7 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
       -DCMAKE_C_FLAGS="-target arm64-apple-ios15.0-macabi" \
       -DCMAKE_CXX_FLAGS="-target arm64-apple-ios15.0-macabi" \
-      -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi -Wl,-install_name,@rpath/box3d.framework/box3d" \
+      -DCMAKE_SHARED_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi -Wl,-install_name,@rpath/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}" \
       -DCMAKE_EXE_LINKER_FLAGS="-target arm64-apple-ios15.0-macabi" \
       ${PRECISION_FLAG} \
       ${VALIDATION_FLAG} \
@@ -107,7 +110,7 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       ${SIMULATOR_FLAG} \
       ${PRECISION_FLAG} \
       ${VALIDATION_FLAG} \
-      -DCMAKE_SHARED_LINKER_FLAGS=-Wl,-install_name,@rpath/box3d.framework/box3d \
+      -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-install_name,@rpath/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}" \
       -DBUILD_SHARED_LIBS=ON \
       -DBOX3D_SAMPLES=OFF \
       -DBOX3D_UNIT_TESTS=OFF
@@ -116,13 +119,13 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
 
   # Create .framework bundle (required by Apple platforms)
   echo "--- Creating framework ---"
-  mkdir -p "${OUTPUT_DIR}/box3d.framework"
-  if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d.dylib" ]; then
-    cp "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d.dylib" "${OUTPUT_DIR}/box3d.framework/box3d"
+  mkdir -p "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework"
+  if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d${LIB_SUFFIX}.dylib" ]; then
+    cp "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d${LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}"
   else
-    cp "${BUILD_DIR}/bin/libbox3d.dylib" "${OUTPUT_DIR}/box3d.framework/box3d"
+    cp "${BUILD_DIR}/bin/libbox3d${LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}"
   fi
-  cat > "${OUTPUT_DIR}/box3d.framework/Info.plist" <<EOF
+  cat > "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -130,13 +133,13 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>box3d</string>
+  <string>box3d${LIB_SUFFIX}</string>
   <key>CFBundleIdentifier</key>
   <string>org.box2d.Box3D</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>box3d</string>
+  <string>box3d${LIB_SUFFIX}</string>
   <key>CFBundlePackageType</key>
   <string>FMWK</string>
   <key>CFBundleShortVersionString</key>
@@ -176,15 +179,15 @@ else
   mkdir -p "${OUTPUT_DIR}"
 
   if [[ "${RUNNER_OS}" == "Windows" ]]; then
-    if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d.dll" ]; then
-      cp "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
+    if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d${LIB_SUFFIX}.dll" ]; then
+      cp "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d${LIB_SUFFIX}.dll" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.dll"
     else
-      cp "${BUILD_DIR}/bin/box3d.dll" "${OUTPUT_DIR}/box3d.dll"
+      cp "${BUILD_DIR}/bin/box3d${LIB_SUFFIX}.dll" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.dll"
     fi
   elif [[ "${RUNNER_OS}" == "Linux" ]]; then
-    cp ${BUILD_DIR}/bin/libbox3d.so "${OUTPUT_DIR}/libbox3d.so"
+    cp "${BUILD_DIR}/bin/libbox3d${LIB_SUFFIX}.so" "${OUTPUT_DIR}/libbox3d${LIB_SUFFIX}.so"
   elif [[ "${RUNNER_OS}" == "macOS" ]]; then
-    cp ${BUILD_DIR}/bin/libbox3d.dylib "${OUTPUT_DIR}/libbox3d.dylib"
+    cp "${BUILD_DIR}/bin/libbox3d${LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/libbox3d${LIB_SUFFIX}.dylib"
   fi
 fi
 
