@@ -162,6 +162,19 @@ static class Program
 		Console.WriteLine("Release native binary verified: asserts stripped");
 #endif
 
+		// === Validate that the other configuration binary is unreachable ===
+		#if DEBUG
+		var suffix = "";
+		#else
+		var suffix = "d";
+		#endif
+		var libName =
+			OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst()
+			? $"@rpath/box3d{suffix}.framework/box3d{suffix}"
+			: $"box3d{suffix}";
+		if (NativeLibrary.TryLoad(libName, out IntPtr handle))
+		    return 3103; // Box3D.targets has a bug if this happens
+
         Console.WriteLine("Test succeeded.");
 		return 0;
 	}

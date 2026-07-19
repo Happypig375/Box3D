@@ -10,11 +10,8 @@ namespace Box3D
     {
         static Box3D()
         {
-            NativeLibrary.SetDllImportResolver(typeof(Box3D).Assembly, (name, assembly, searchPath) =>
+            NativeLibrary.SetDllImportResolver(typeof(Box3D).Assembly, (_, _, _) =>
             {
-                if (name != "box3d")
-                    return IntPtr.Zero;
-
                 bool useDebug = AppContext.TryGetSwitch("Box3D.Debug", out bool debug) && debug; // Set in Box3D.targets
                 string suffix = useDebug ? "d" : "";
 
@@ -23,10 +20,7 @@ namespace Box3D
                     return NativeLibrary.Load($"@rpath/box3d{suffix}.framework/box3d{suffix}");
 
                 // Desktop / Android
-                if (NativeLibrary.TryLoad($"box3d{suffix}", assembly, searchPath, out IntPtr handle))
-                    return handle;
-
-                return IntPtr.Zero;
+                return NativeLibrary.TryLoad($"box3d{suffix}");
             });
 
             // Route native B3_ASSERT to C# Trace.Assert so asserts are visible
