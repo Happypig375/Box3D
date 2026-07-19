@@ -17,11 +17,11 @@
   <Target Name="_FilterBox3DNativeBinaries" AfterTargets="ResolvePackageAssets">
     <ItemGroup Condition="'$(Configuration)' == 'Debug'">
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And !$([System.String]::Copy('%(Filename)').Contains('box3dd'))" />
+        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
     </ItemGroup>
     <ItemGroup Condition="'$(Configuration)' != 'Debug'">
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And $([System.String]::Copy('%(Filename)').Contains('box3dd'))" />
+        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And $([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
     </ItemGroup>
   </Target>
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
