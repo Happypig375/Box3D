@@ -31,14 +31,12 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 # The managed Debug configuration consumes a checked Release native binary.
 # Keep the toolchain's exact Release optimization flags, then remove only
 # NDEBUG so Box3D's existing validation and assertions remain active.
-CMAKE_CONFIGURATION_FLAGS=()
 if [[ "${BUILD_TYPE}" == "Debug" ]]; then
   BUILD_DIR="build-checked"
   NATIVE_BUILD_TYPE="Release"
   LIB_SUFFIX="d"
   SOURCE_LIB_SUFFIX=""
   DEFAULT_VALIDATE="ON"
-  CMAKE_CONFIGURATION_FLAGS+=("-DCMAKE_PROJECT_INCLUDE=${PWD}/Scripts/CheckedRelease.cmake")
 else
   BUILD_DIR="build"
   NATIVE_BUILD_TYPE="${BUILD_TYPE}"
@@ -46,6 +44,17 @@ else
   SOURCE_LIB_SUFFIX=""
   DEFAULT_VALIDATE="OFF"
 fi
+
+# macOS ships Bash 3.2, where expanding an empty array under `set -u` is an
+# error. Add the checked-build include only when it is needed instead of
+# carrying an optionally empty argument array through every CMake invocation.
+configure_cmake() {
+  if [[ "${BUILD_TYPE}" == "Debug" ]]; then
+    cmake "$@" "-DCMAKE_PROJECT_INCLUDE=${PWD}/Scripts/CheckedRelease.cmake"
+  else
+    cmake "$@"
+  fi
+}
 
 echo "NATIVE_BUILD_TYPE: ${NATIVE_BUILD_TYPE}"
 
@@ -83,10 +92,9 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
     # Mac Catalyst: Unix Makefiles with explicit target triple.
     # The Xcode generator always produces iOS binaries regardless of overrides.
     SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-    cmake -S box3d -B ${BUILD_DIR} \
+    configure_cmake -S box3d -B ${BUILD_DIR} \
       -G "Unix Makefiles" \
       -DCMAKE_BUILD_TYPE="${NATIVE_BUILD_TYPE}" \
-      "${CMAKE_CONFIGURATION_FLAGS[@]}" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_OSX_SYSROOT="$SDKROOT" \
@@ -115,10 +123,9 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       APPLE_SDK_NAME="tvOS"
       SIMULATOR_FLAG="-DCMAKE_OSX_SYSROOT=appletvsimulator"
     fi
-    cmake -S box3d -B ${BUILD_DIR} \
+    configure_cmake -S box3d -B ${BUILD_DIR} \
       -GXcode \
       -DCMAKE_SYSTEM_NAME="${APPLE_SDK_NAME}" \
-      "${CMAKE_CONFIGURATION_FLAGS[@]}" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       ${SIMULATOR_FLAG} \
@@ -180,9 +187,8 @@ else
     CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN} -DANDROID_ABI=${ANDROID_ABI} -DANDROID_PLATFORM=android-${ANDROID_PLATFORM_VER} -DANDROID_STL=c++_static"
   fi
 
-  cmake -S box3d -B ${BUILD_DIR} \
+  configure_cmake -S box3d -B ${BUILD_DIR} \
     -DCMAKE_BUILD_TYPE="${NATIVE_BUILD_TYPE}" \
-    "${CMAKE_CONFIGURATION_FLAGS[@]}" \
     -DBUILD_SHARED_LIBS=ON \
     ${PRECISION_FLAG} \
     ${FLAGS:-} \
