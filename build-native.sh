@@ -12,8 +12,8 @@
 #   RUNNER_OS  - Windows / Linux / macOS  (not needed for iOS – auto-detected)
 #   FLAGS      - additional CMake flags
 #   LARGE_WORLDS  - non-empty to enable BOX3D_DOUBLE_PRECISION (large worlds)
-#   BUILD_TYPE - CMake build type (default: Release)
-#   BOX3D_VALIDATE - ON to enable BOX3D_VALIDATE (default: OFF, set to ON for Debug builds)
+#   BUILD_TYPE - package variant (Release or Debug; Debug produces an optimized checked binary)
+#   BOX3D_VALIDATE - ON to enable BOX3D_VALIDATE (defaults to ON for Debug)
 #   Android-only:
 #     ANDROID_ABI, ANDROID_NDK_VER, ANDROID_PLATFORM_VER
 set -eu
@@ -28,19 +28,30 @@ echo "BUILD_TYPE: ${BUILD_TYPE:-Release}"
 
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
-# Use a separate build directory for Debug to avoid conflicts with Release
-# Library suffix matching CMAKE_DEBUG_POSTFIX in box3d/src/CMakeLists.txt ("d")
+# The managed Debug configuration consumes a checked Release native binary.
+# Keep the toolchain's exact Release optimization flags, then remove only
+# NDEBUG so Box3D's existing validation and assertions remain active.
+CMAKE_CONFIGURATION_FLAGS=()
 if [[ "${BUILD_TYPE}" == "Debug" ]]; then
-  BUILD_DIR="build-debug"
+  BUILD_DIR="build-checked"
+  NATIVE_BUILD_TYPE="Release"
   LIB_SUFFIX="d"
+  SOURCE_LIB_SUFFIX=""
+  DEFAULT_VALIDATE="ON"
+  CMAKE_CONFIGURATION_FLAGS+=("-DCMAKE_PROJECT_INCLUDE=${PWD}/Scripts/CheckedRelease.cmake")
 else
   BUILD_DIR="build"
+  NATIVE_BUILD_TYPE="${BUILD_TYPE}"
   LIB_SUFFIX=""
+  SOURCE_LIB_SUFFIX=""
+  DEFAULT_VALIDATE="OFF"
 fi
 
+echo "NATIVE_BUILD_TYPE: ${NATIVE_BUILD_TYPE}"
+
 # Precision suffix for output directory
-# Validation flag (OFF by default, ON for Debug builds when explicitly set)
-BOX3D_VALIDATE="${BOX3D_VALIDATE:-OFF}"
+# Validation and assertions are enabled for the checked Debug asset by default.
+BOX3D_VALIDATE="${BOX3D_VALIDATE:-${DEFAULT_VALIDATE}}"
 if [[ "${BOX3D_VALIDATE}" == "ON" ]]; then
   VALIDATION_FLAG="-DBOX3D_VALIDATE=ON"
 else
@@ -74,7 +85,8 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
     SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
     cmake -S box3d -B ${BUILD_DIR} \
       -G "Unix Makefiles" \
-      -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+      -DCMAKE_BUILD_TYPE="${NATIVE_BUILD_TYPE}" \
+      "${CMAKE_CONFIGURATION_FLAGS[@]}" \
       -DCMAKE_C_COMPILER=clang \
       -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_OSX_SYSROOT="$SDKROOT" \
@@ -90,7 +102,7 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       -DBUILD_SHARED_LIBS=ON \
       -DBOX3D_SAMPLES=OFF \
       -DBOX3D_UNIT_TESTS=OFF
-    cmake --build ${BUILD_DIR} --config "${BUILD_TYPE}"
+    cmake --build ${BUILD_DIR} --config "${NATIVE_BUILD_TYPE}"
   else
     # iOS / iOS Simulator / tvOS / tvOS Simulator: Xcode generator
     APPLE_SDK_NAME="iOS"
@@ -106,6 +118,7 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
     cmake -S box3d -B ${BUILD_DIR} \
       -GXcode \
       -DCMAKE_SYSTEM_NAME="${APPLE_SDK_NAME}" \
+      "${CMAKE_CONFIGURATION_FLAGS[@]}" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       ${SIMULATOR_FLAG} \
@@ -115,16 +128,16 @@ if [[ "${NAME}" == ios-* || "${NAME}" == iossimulator-* || "${NAME}" == tvos-* |
       -DBUILD_SHARED_LIBS=ON \
       -DBOX3D_SAMPLES=OFF \
       -DBOX3D_UNIT_TESTS=OFF
-    cmake --build ${BUILD_DIR} --config "${BUILD_TYPE}" -- CODE_SIGNING_ALLOWED=NO
+    cmake --build ${BUILD_DIR} --config "${NATIVE_BUILD_TYPE}" -- CODE_SIGNING_ALLOWED=NO
   fi
 
   # Create .framework bundle (required by Apple platforms)
   echo "--- Creating framework ---"
   mkdir -p "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework"
-  if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d${LIB_SUFFIX}.dylib" ]; then
-    cp "${BUILD_DIR}/bin/${BUILD_TYPE}/libbox3d${LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}"
+  if [ -f "${BUILD_DIR}/bin/${NATIVE_BUILD_TYPE}/libbox3d${SOURCE_LIB_SUFFIX}.dylib" ]; then
+    cp "${BUILD_DIR}/bin/${NATIVE_BUILD_TYPE}/libbox3d${SOURCE_LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}"
   else
-    cp "${BUILD_DIR}/bin/libbox3d${LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}"
+    cp "${BUILD_DIR}/bin/libbox3d${SOURCE_LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/box3d${LIB_SUFFIX}"
   fi
   cat > "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.framework/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -168,27 +181,28 @@ else
   fi
 
   cmake -S box3d -B ${BUILD_DIR} \
-    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+    -DCMAKE_BUILD_TYPE="${NATIVE_BUILD_TYPE}" \
+    "${CMAKE_CONFIGURATION_FLAGS[@]}" \
     -DBUILD_SHARED_LIBS=ON \
     ${PRECISION_FLAG} \
     ${FLAGS:-} \
     ${CMAKE_FLAGS}
 
-  cmake --build ${BUILD_DIR} --config "${BUILD_TYPE}"
+  cmake --build ${BUILD_DIR} --config "${NATIVE_BUILD_TYPE}"
 
   echo "--- Copying binaries ---"
   mkdir -p "${OUTPUT_DIR}"
 
   if [[ "${RUNNER_OS}" == "Windows" ]]; then
-    if [ -f "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d${LIB_SUFFIX}.dll" ]; then
-      cp "${BUILD_DIR}/bin/${BUILD_TYPE}/box3d${LIB_SUFFIX}.dll" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.dll"
+    if [ -f "${BUILD_DIR}/bin/${NATIVE_BUILD_TYPE}/box3d${SOURCE_LIB_SUFFIX}.dll" ]; then
+      cp "${BUILD_DIR}/bin/${NATIVE_BUILD_TYPE}/box3d${SOURCE_LIB_SUFFIX}.dll" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.dll"
     else
-      cp "${BUILD_DIR}/bin/box3d${LIB_SUFFIX}.dll" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.dll"
+      cp "${BUILD_DIR}/bin/box3d${SOURCE_LIB_SUFFIX}.dll" "${OUTPUT_DIR}/box3d${LIB_SUFFIX}.dll"
     fi
   elif [[ "${RUNNER_OS}" == "Linux" ]]; then
-    cp "${BUILD_DIR}/bin/libbox3d${LIB_SUFFIX}.so" "${OUTPUT_DIR}/libbox3d${LIB_SUFFIX}.so"
+    cp "${BUILD_DIR}/bin/libbox3d${SOURCE_LIB_SUFFIX}.so" "${OUTPUT_DIR}/libbox3d${LIB_SUFFIX}.so"
   elif [[ "${RUNNER_OS}" == "macOS" ]]; then
-    cp "${BUILD_DIR}/bin/libbox3d${LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/libbox3d${LIB_SUFFIX}.dylib"
+    cp "${BUILD_DIR}/bin/libbox3d${SOURCE_LIB_SUFFIX}.dylib" "${OUTPUT_DIR}/libbox3d${LIB_SUFFIX}.dylib"
   fi
 fi
 

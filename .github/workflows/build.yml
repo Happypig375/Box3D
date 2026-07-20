@@ -51,7 +51,7 @@ jobs:
           ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
         run: ./build-native.sh
 
-      - name: Build (Debug)
+      - name: Build (Debug checks)
         shell: bash
         env:
           NAME: ${{ matrix.platform.name }}
@@ -60,7 +60,8 @@ jobs:
           LARGE_WORLDS: ${{ matrix.large-worlds }}
           ANDROID_ABI: ${{ matrix.platform.abi }}
           BUILD_TYPE: Debug
-          BOX3D_VALIDATE: ON # Note that we also enable all validation for Debug
+          # Debug package assets are optimized checked binaries. build-native.sh
+          # enables assertions and validation by default for this variant.
           ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
           ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
         run: ./build-native.sh
