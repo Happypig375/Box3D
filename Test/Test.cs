@@ -28,9 +28,6 @@ static class Program
 		return 0; // prevent native __debugbreak()/__builtin_trap()
 	}
 
-	[DllImport("kernel32", CharSet = CharSet.Unicode, ExactSpelling = true)]
-	private static extern int GetModuleFileName(nint hModule, System.Text.StringBuilder lpFilename, int nSize);
-
 	public static unsafe int Main()
 	{
         Console.WriteLine("Starting test...");
@@ -75,16 +72,15 @@ static class Program
 			: $"box3d{suffix}";
 		if (NativeLibrary.TryLoad(libName, out IntPtr handle))
 		{
-			var path = "";
-			if (OperatingSystem.IsWindows())
-			{
-				var sb = new System.Text.StringBuilder(1024);
-				if (GetModuleFileName(handle, sb, sb.Capacity) > 0)
-					path = sb.ToString();
-			}
-			Console.WriteLine($"Box3D.targets failed to filter native binaries! Loaded from: '{path}'");
+			// On Windows, "box3d" also matches the managed Box3D.dll because
+			// file-name matching is case-insensitive. Only a module exporting a
+			// Box3D native symbol proves that the opposite native binary is reachable.
 			NativeLibrary.Free(handle);
-			return 3003;
+			if (NativeLibrary.TryGetExport(handle, "b3SetAssertFcn", out _))
+			{
+				Console.Error.WriteLine($"Box3D.targets failed to filter native binaries!");
+				return 3003;
+			}
 		}
 
 		// === Create a world and run a simulation ===

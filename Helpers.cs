@@ -1,28 +1,40 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 [module: SkipLocalsInit] // Same semantics as C for inlined functions
 namespace Box3D
 {
-    unsafe partial class Box3D
+    internal static class Box3DModuleInitializer
     {
-        static Box3D()
+        [ModuleInitializer]
+        [SuppressMessage("Usage", "CA2255", Justification = "The native resolver must be registered before any Box3D P/Invoke is resolved.")]
+        internal static void InitializeNativeLibraryResolver()
         {
-            NativeLibrary.SetDllImportResolver(typeof(Box3D).Assembly, (_, assembly, searchPath) =>
+            // Register before the Box3D type initializer performs its first P/Invoke.
+            // Registering from that type initializer is too late on Apple AOT runtimes,
+            // which resolve the import triggered by b3SetAssertFcn before entering the initializer body.
+            NativeLibrary.SetDllImportResolver(typeof(Box3D).Assembly, (libraryName, assembly, searchPath) =>
             {
                 bool useDebug = AppContext.TryGetSwitch("Box3D.Debug", out bool debug) && debug; // Set in Box3D.targets
                 string suffix = useDebug ? "d" : "";
 
-                // Apple framework path with debug suffix - see https://github.com/dotnet/macios/issues/21238
+                // Apple frameworks fail to be searched by default - see see https://github.com/dotnet/macios/issues/21238
                 if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacCatalyst())
                     return NativeLibrary.Load($"@rpath/box3d{suffix}.framework/box3d{suffix}");
 
-                // Desktop / Android
                 return NativeLibrary.Load($"box3d{suffix}", assembly, searchPath);
             });
+        }
+    }
 
+    unsafe partial class Box3D
+    {
+        static Box3D()
+        {
             // Route native B3_ASSERT to C# Trace.Assert so asserts are visible
             // through the .NET debug/trace infrastructure without crashing the process.
             // This crash occurs through:
