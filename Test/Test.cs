@@ -72,8 +72,15 @@ static class Program
 			: $"box3d{suffix}";
 		if (NativeLibrary.TryLoad(libName, out IntPtr handle))
 		{
-			Console.WriteLine("Box3D.targets failed to filter native binaries!");
-		    return 3003;
+			// On Windows, "box3d" also matches the managed Box3D.dll because
+			// file-name matching is case-insensitive. Only a module exporting a
+			// Box3D native symbol proves that the opposite native binary is reachable.
+			NativeLibrary.Free(handle);
+			if (NativeLibrary.TryGetExport(handle, "b3SetAssertFcn", out _))
+			{
+				Console.Error.WriteLine($"Box3D.targets failed to filter native binaries!");
+				return 3003;
+			}
 		}
 
 		// === Create a world and run a simulation ===

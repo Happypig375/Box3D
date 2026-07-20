@@ -4,24 +4,42 @@
     Box3D native binary selection for Debug vs Release consuming projects.
 
     Both box3d (Release) and box3dd (Debug) native binaries are delivered
-    in the NuGet package under runtimes/<rid>/native/, so the SDK's built-in
-    RID resolution automatically adds all matching files to NativeCopyLocalItems.
+    in the NuGet package under runtimes/<rid>/native/. Depending on whether the
+    consuming build has an explicit RID, the SDK exposes those assets through
+    NativeCopyLocalItems or RuntimeTargetsCopyLocalItems.
 
     This .targets file:
-      1. Filters NativeCopyLocalItems to remove the Release native binary
-         for Debug and the Debug (box3dd) native binary for Release, so only the correct variant
-         is copied to the build output.
+      1. Filters both native asset item lists to remove the Release native
+         binary for Debug and the Debug (box3dd) native binary for Release, so
+         only the correct variant is copied to the build output.
       2. Sets the "Box3D.Debug" AppContext switch that Helpers.cs DllImportResolver
          reads at runtime to load box3dd in Debug and box3d in Release.
   -->
   <Target Name="_FilterBox3DNativeBinaries" AfterTargets="ResolvePackageAssets">
     <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+      <!-- RID-specific builds use NativeCopyLocalItems. Portable builds use RuntimeTargetsCopyLocalItems. -->
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+        Condition="
+          (('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')
+            Or ('%(NuGetPackageId)' == '' And $([System.String]::Copy('%(Identity)').Contains('box3d'))))
+          And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)"
+        Condition="
+          (('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')
+            Or ('%(NuGetPackageId)' == '' And $([System.String]::Copy('%(Identity)').Contains('box3d'))))
+          And !$([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
     </ItemGroup>
     <ItemGroup Condition="'$(Configuration)' != 'Debug'">
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds') And $([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+        Condition="
+          (('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')
+            Or ('%(NuGetPackageId)' == '' And $([System.String]::Copy('%(Identity)').Contains('box3d'))))
+          And $([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
+      <RuntimeTargetsCopyLocalItems Remove="@(RuntimeTargetsCopyLocalItems)"
+        Condition="
+          (('%(NuGetPackageId)' == 'Box3D' Or '%(NuGetPackageId)' == 'Box3D.LargeWorlds')
+            Or ('%(NuGetPackageId)' == '' And $([System.String]::Copy('%(Identity)').Contains('box3d'))))
+          And $([System.String]::Copy('%(Identity)').Contains('box3dd'))" />
     </ItemGroup>
   </Target>
   <ItemGroup Condition="'$(Configuration)' == 'Debug'">
