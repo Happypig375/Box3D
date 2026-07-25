@@ -1,7 +1,8 @@
 // PostProcessNativeMethods.cs
 // Post-processes ClangSharp-generated NativeMethods.cs to fix issues
 // that ClangSharp cannot handle automatically:
-//   1. Remap C math functions (sqrtf -> System.MathF.Sqrt, etc.)
+//   1. Convert static readonly fields that invoke a function (C macros
+//      expanded with function calls) to expression-bodied properties
 //   2. Fix (boolExpr) != 0 patterns that are invalid in C#
 //
 // Usage:
@@ -30,18 +31,100 @@ static class PostProcessor
 {
     /// <summary>
     /// Post-processes ClangSharp-generated C# code:
-    /// 1. Remaps C math functions (sqrtf->System.MathF.Sqrt, etc.)
+    /// 1. Converts static readonly fields that invoke a function to properties
     /// 2. Fixes bool != 0 comparisons
     /// </summary>
     public static string PostProcessCSharp(string content)
     {
-        // Step 1: Math function remapping (fully qualified to avoid missing using)
+        // Step 1: Convert non-constant readonly fields that invoke a function to properties.
+        // C macros that expand to expressions with function calls (e.g.
+        // #define B3_HUGE (1.0e5f * b3GetLengthUnitsPerMeter())) are generated as
+        // "public static readonly float B3_HUGE = ...;" by ClangSharp, but the
+        // function must be called at each access site, not once at static init.
+        content = ConvertReadonlyFieldsToProperties(content);
 
         // Step 2: Fix bool != 0 / bool == 0
         content = FixBoolComparisons(content);
 
         return content;
     }
+
+    /// <summary>
+    /// Finds single-line "public static readonly T name = expr;" where expr contains a
+    /// method call and converts to "public static T name => expr;".
+    /// Struct-initializer fields (new T { ... }) and pure-constant fields are left alone.
+    /// </summary>
+    static string ConvertReadonlyFieldsToProperties(string content)
+    {
+        // Match: public static readonly <type> <name> = <value>;
+        // The type can contain generic markers like delegate*<...>, so be careful.
+        var fieldRegex = new Regex(
+            @"public static readonly\s+(?<typeAndName>[^=]+?)\s*=\s*(?<value>[^;]+?)\s*;",
+            RegexOptions.Compiled);
+
+        var sb = new StringBuilder(content);
+        int offset = 0;
+
+        foreach (Match match in fieldRegex.Matches(content))
+        {
+            string typeAndName = match.Groups["typeAndName"].Value;
+            string value = match.Groups["value"].Value;
+
+            if (!ContainsFunctionCall(value))
+                continue;
+
+            // typeAndName is "<type> <name>", split on the last space
+            int lastSpace = typeAndName.LastIndexOf(' ');
+            if (lastSpace < 0)
+                continue;
+
+            string type = typeAndName.AsSpan(0, lastSpace).Trim().ToString();
+            string name = typeAndName.AsSpan(lastSpace + 1).Trim().ToString();
+
+            if (type.Length == 0 || name.Length == 0)
+                continue;
+
+            int idx = match.Index + offset;
+            string replacement = $"public static {type} {name} => {value};";
+            sb.Remove(idx, match.Length);
+            sb.Insert(idx, replacement);
+            offset += replacement.Length - match.Length;
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="expr"/> contains an identifier followed by '('
+    /// that looks like a method/function call (excluding language keywords such as
+    /// new/typeof/sizeof/default/nameof).
+    /// </summary>
+    static bool ContainsFunctionCall(string expr)
+    {
+        // Look for identifier( patterns, but exclude C# keywords
+        var callRegex = new Regex(@"(?<![a-zA-Z_])[a-zA-Z_][a-zA-Z0-9_]*\s*\(", RegexOptions.Compiled);
+
+        foreach (Match m in callRegex.Matches(expr))
+        {
+            // Extract just the identifier (trim trailing spaces and '(')
+            string ident = m.Value;
+            int parenIdx = ident.IndexOf('(');
+            if (parenIdx >= 0)
+                ident = ident.AsSpan(0, parenIdx).Trim().ToString();
+
+            if (!IsKeyword(ident))
+                return true;
+        }
+
+        return false;
+    }
+
+    static bool IsKeyword(string word) => word switch
+    {
+        "new" or "typeof" or "sizeof" or "default" or "nameof"
+        or "checked" or "unchecked" or "true" or "false" => true,
+        _ => false,
+    };
 
     static string FixBoolComparisons(string content)
     {
