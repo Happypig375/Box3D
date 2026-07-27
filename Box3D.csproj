@@ -122,7 +122,7 @@
       <!-- macro definition flags -->
       <_RspCsLines Include="-D;B3_ENABLE_ASSERT;B3_ENABLE_VALIDATION" />
       <!-- macro exclusions (these function-like macros cannot be converted to C#) -->
-      <_RspCsLines Include="-e;B3_ALIGN_AS;B3_LITERAL;B3_ASSERT;B3_VALIDATE;B3_IS_NULL;B3_IS_NON_NULL;B3_ID_EQUALS" />
+      <_RspCsLines Include="-e;B3_ALIGN_AS;B3_LITERAL;B3_ASSERT;B3_VALIDATE;B3_IS_NULL;B3_IS_NON_NULL;B3_ID_EQUALS;B3_PRINTF_FORMAT" />
       <!-- Precision-specific defines from Box3D.LargeWorlds -->
       <_RspCsLines Include="$(Box3DClangDefines)" Condition="'$(Box3DClangDefines)' != ''" />
     </ItemGroup>
