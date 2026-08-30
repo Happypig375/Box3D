@@ -121,6 +121,11 @@
       <_RspCsLines Include="-r;sqrtf=System.MathF.Sqrt;remainderf=System.MathF.IEEERemainder;absf=System.MathF.Abs;B3_VALIDATE=B3_ASSERT" />
       <!-- macro definition flags -->
       <_RspCsLines Include="-D;B3_ENABLE_ASSERT;B3_ENABLE_VALIDATION" />
+      <!-- Temporary workaround for dotnet/ClangSharp#835
+           (https://github.com/dotnet/ClangSharp/issues/835): UINT64_MAX-backed macro
+           constants are emitted as nuint on Unix but ulong on Windows. The explicit
+           managed types keep both generated variants ABI- and source-compatible. -->
+      <_RspCsLines Include="-wt;B3_DEFAULT_CATEGORY_BITS=ulong;B3_DEFAULT_MASK_BITS=ulong" />
       <!-- macro exclusions (these function-like macros cannot be converted to C#) -->
       <_RspCsLines Include="-e;B3_ALIGN_AS;B3_LITERAL;B3_ASSERT;B3_VALIDATE;B3_IS_NULL;B3_IS_NON_NULL;B3_ID_EQUALS;B3_PRINTF_FORMAT" />
       <!-- Precision-specific defines from Box3D.LargeWorlds -->
@@ -143,6 +148,22 @@
     <Exec Command="dotnet run PostProcessNativeMethods.cs -- &quot;$(MSBuildProjectDirectory)/NativeMethods.cs&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)Scripts" />
   </Target>
+
+  <!-- Generate debugger displays/proxies from the just-post-processed API. The
+       intermediate path is project-specific, so the LargeWorlds overlay gets its
+       own deterministic file and no generated source is tracked. -->
+  <Target Name="GenerateDebuggerProperties"
+          BeforeTargets="GenerateNativeBindingsDocumentation"
+          DependsOnTargets="PostProcessNativeMethods"
+          Inputs="NativeMethods.cs;$(MSBuildThisFileDirectory)Scripts/GenerateDebuggerProxies.cs"
+          Outputs="$(IntermediateOutputPath)Box3D.DebuggerProxies.cs">
+    <Exec Command="dotnet run GenerateDebuggerProxies.cs -- &quot;$(MSBuildProjectDirectory)/NativeMethods.cs&quot; &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)Box3D.DebuggerProxies.cs&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)Scripts" />
+  </Target>
+
+  <ItemGroup>
+    <Compile Include="$(IntermediateOutputPath)Box3D.DebuggerProxies.cs" />
+  </ItemGroup>
 
   <!-- Generate XML documentation from Doxygen comments in the C headers -->
   <Target Name="GenerateNativeBindingsDocumentation"
