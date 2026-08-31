@@ -121,11 +121,6 @@
       <_RspCsLines Include="-r;sqrtf=System.MathF.Sqrt;remainderf=System.MathF.IEEERemainder;absf=System.MathF.Abs;B3_VALIDATE=B3_ASSERT" />
       <!-- macro definition flags -->
       <_RspCsLines Include="-D;B3_ENABLE_ASSERT;B3_ENABLE_VALIDATION" />
-      <!-- Temporary workaround for dotnet/ClangSharp#835
-           (https://github.com/dotnet/ClangSharp/issues/835): UINT64_MAX-backed macro
-           constants are emitted as nuint on Unix but ulong on Windows. The explicit
-           managed types keep both generated variants ABI- and source-compatible. -->
-      <_RspCsLines Include="-wt;B3_DEFAULT_CATEGORY_BITS=ulong;B3_DEFAULT_MASK_BITS=ulong" />
       <!-- macro exclusions (these function-like macros cannot be converted to C#) -->
       <_RspCsLines Include="-e;B3_ALIGN_AS;B3_LITERAL;B3_ASSERT;B3_VALIDATE;B3_IS_NULL;B3_IS_NON_NULL;B3_ID_EQUALS;B3_PRINTF_FORMAT" />
       <!-- Precision-specific defines from Box3D.LargeWorlds -->
@@ -139,6 +134,15 @@
       <Compile Include="NativeMethods.cs" />
       <Compile Include="$(MSBuildThisFileDirectory)Helpers.cs" />
     </ItemGroup>
+  </Target>
+
+  <!-- Work around dotnet/ClangSharp#835 after generation. ClangSharp can emit
+       UINT64_MAX-backed macros as nuint on Unix and ulong on Windows. -->
+  <Target Name="PatchClangSharp835"
+          BeforeTargets="PostProcessNativeMethods"
+          DependsOnTargets="GenerateNativeBindings">
+    <Exec Command="dotnet run --file PatchClangSharp835.cs -- &quot;$(MSBuildProjectDirectory)/NativeMethods.cs&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)Scripts" />
   </Target>
 
   <!-- Post-process NativeMethods.cs to fix math functions and bool comparisons -->

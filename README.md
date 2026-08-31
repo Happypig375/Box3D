@@ -317,10 +317,11 @@ dotnet build
 
 This will:
 1. **Stage** the C headers from `box3d/include/box3d/` into `obj/headers/`, preprocessing `math_functions.h` to replace C compound literals (`B3_LITERAL`) with ClangSharpPInvokeGenerator-compatible member initialization.
-2. **Generate** `NativeMethods.cs` using [ClangSharpPInvokeGenerator](https://github.com/dotnet/clangsharp) (pinned via `dotnet-tools.json`). C math functions are remapped (`sqrtf` → `System.MathF.Sqrt`, etc.) via ClangSharp's `-r` flag. The two UINT64_MAX-backed defaults use explicit `ulong` types as a temporary workaround for [dotnet/ClangSharp#835](https://github.com/dotnet/ClangSharp/issues/835), whose platform-dependent `nuint` inference otherwise differs between Unix and Windows.
-3. **Post-process** the generated code to convert `static readonly` fields with function calls into expression-bodied properties (so C macros that invoke functions call them at each access rather than once at static init) and fix `bool != 0` comparisons.
-4. **Generate debugger properties** in the project-specific `obj/` directory with `Scripts/GenerateDebuggerProxies.cs`. This adds debugger displays for IDs and generated native-state proxies for World, Body, Shape, Joint, and Contact using available `b3*Get/Is` APIs; the source is regenerated for both precision variants and is not tracked.
-5. **Compile** the package and produce `Box3D.dll` + `Box3D.xml` (XML documentation).
+2. **Generate** `NativeMethods.cs` using [ClangSharpPInvokeGenerator](https://github.com/dotnet/clangsharp) (pinned via `dotnet-tools.json`). C math functions are remapped (`sqrtf` → `System.MathF.Sqrt`, etc.) via ClangSharp's `-r` flag.
+3. **Patch** the two UINT64_MAX-backed defaults with `Scripts/PatchClangSharp835.cs`, a temporary post-generation workaround for [dotnet/ClangSharp#835](https://github.com/dotnet/ClangSharp/issues/835). It normalizes both platform variants to `ulong` constants while leaving unrelated generated code untouched.
+4. **Post-process** the generated code to convert `static readonly` fields with function calls into expression-bodied properties (so C macros that invoke functions call them at each access rather than once at static init) and fix `bool != 0` comparisons.
+5. **Generate debugger properties** in the project-specific `obj/` directory with `Scripts/GenerateDebuggerProxies.cs`. This adds debugger displays for IDs and generated native-state proxies for World, Body, Shape, Joint, and Contact using available `b3*Get/Is` APIs; the source is regenerated for both precision variants and is not tracked.
+6. **Compile** the package and produce `Box3D.dll` + `Box3D.xml` (XML documentation).
 
 > [!NOTE]
 > `NativeMethods.cs` and `Box3D.xml` are generated at build time and not committed to the repository. They are listed in `.gitignore`.
@@ -365,13 +366,14 @@ The CI script `build-native.sh` handles all platforms (including iOS) and both p
 This repository wraps the upstream Box3D C engine with automatically generated C# bindings. The pipeline runs entirely within MSBuild:
 
 ```
-PreprocessHeaders  →  GenerateNativeBindings  →  PostProcessNativeMethods  →  GenerateDebuggerProperties  →  GenerateNativeBindingsDocumentation  →  Build
+PreprocessHeaders  →  GenerateNativeBindings  →  PatchClangSharp835  →  PostProcessNativeMethods  →  GenerateDebuggerProperties  →  GenerateNativeBindingsDocumentation  →  Build
 ```
 
 | Stage | Script | Purpose |
 |---|---|---|
 | Preprocess headers | `Scripts/StageHeaders.cs` | Copies `.h` files to `obj/`, rewrites `B3_LITERAL` compound literals and injects assertion macro stubs so ClangSharp can parse them |
 | Generate bindings | ClangSharpPInvokeGenerator | Produces `NativeMethods.cs` with P/Invoke declarations and inline function bodies; remaps C math functions via `-r` flags |
+| Patch ClangSharp #835 | `Scripts/PatchClangSharp835.cs` | Normalizes the two UINT64_MAX-backed defaults to `public const ulong ... = 0xffffffffffffffffUL;`; fails if targets are missing or duplicated |
 | Post-process | `Scripts/PostProcessNativeMethods.cs` | Converts `static readonly` fields that invoke a function into expression-bodied properties; fixes `(boolExpr) != 0` patterns |
 | Debugger properties | `Scripts/GenerateDebuggerProxies.cs` | Derives deterministic debugger displays and native-state proxy properties from generated `b3*Get/Is/Are` methods, including value-struct displays |
 | Generate docs | `Scripts/DocGen.cs` | Extracts Doxygen comments from C headers and writes `Box3D.xml` for IntelliSense |
@@ -409,7 +411,7 @@ The build matrix has two dimensions: `large-worlds` (empty for single-precision,
 
 Each precision&ndash;platform combination runs the single `build-native.sh` script, which handles Android, iOS, and desktop builds in a single code path. The resulting binaries are compressed and uploaded as named artifacts (`native-{large-worlds}-{platform}.tar`).
 
-The `pack-nuget` job then downloads the matching artifacts, runs the MSBuild binding pipeline (header staging &rarr; ClangSharp &rarr; post-process &rarr; debugger properties &rarr; compile &rarr; doc gen), and produces the `.nupkg`. A `validate` job exercises the package on all desktop and mobile platforms.
+The `pack-nuget` job then downloads the matching artifacts, runs the MSBuild binding pipeline (header staging &rarr; ClangSharp &rarr; ClangSharp #835 patch &rarr; post-process &rarr; debugger properties &rarr; compile &rarr; doc gen), and produces the `.nupkg`. A `validate` job exercises the package on all desktop and mobile platforms.
 
 Both packages are pushed to NuGet.org on every push to `master`.
 
