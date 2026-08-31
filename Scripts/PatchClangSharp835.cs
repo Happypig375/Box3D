@@ -57,9 +57,9 @@ static class Patcher
     private const string Mask = "B3_DEFAULT_MASK_BITS";
 
     // NativeTypeName text varies between ClangSharp platforms and versions;
-    // match only the exact target public const declarations.
+    // match only the exact target declarations.
     private static readonly Regex Declaration = new(
-        @"(?m)^(?<indent>[ \t]*)public[ \t]+const[ \t]+(?<type>[^ \t\r\n]+)[ \t]+(?<name>B3_DEFAULT_(?:CATEGORY|MASK)_BITS)\b[ \t]*=[ \t]*(?<initializer>[^;\r\n]*?)[ \t]*;",
+        @"(?m)^(?<indent>[ \t]*)public[ \t]+(?<modifier>const|static[ \t]+readonly)[ \t]+(?<type>[^ \t\r\n]+)[ \t]+(?<name>B3_DEFAULT_(?:CATEGORY|MASK)_BITS)\b[ \t]*=[ \t]*(?<initializer>[^;\r\n]*?)[ \t]*;",
         RegexOptions.Compiled);
 
     public static string Patch(string content)
@@ -72,12 +72,13 @@ static class Patcher
 
         foreach (Match match in matches)
         {
+            string modifier = Regex.Replace(match.Groups["modifier"].Value, @"[ \t]+", " ");
             string type = match.Groups["type"].Value;
-            string initializer = match.Groups["initializer"].Value.Trim();
-            bool knownUnix = type == "nuint" && initializer == "nuint.MaxValue";
-            bool knownWindows = type == "ulong" && initializer == "0xffffffffffffffffUL";
+            string initializer = Regex.Replace(match.Groups["initializer"].Value.Trim(), @"[ \t]+", "");
+            bool knownUnix = modifier == "static readonly" && type == "nuint" && initializer == "unchecked((nuint)(18446744073709551615U))";
+            bool knownWindows = modifier == "const" && type == "ulong" && initializer == "0xffffffffffffffffUL";
             if (!knownUnix && !knownWindows)
-                throw new InvalidOperationException($"Unexpected {match.Groups["name"].Value} declaration: expected nuint = nuint.MaxValue or ulong = 0xffffffffffffffffUL, found {type} = {initializer}.");
+                throw new InvalidOperationException($"Unexpected {match.Groups["name"].Value} declaration: expected public static readonly nuint = unchecked((nuint)(18446744073709551615U)) or public const ulong = 0xffffffffffffffffUL, found public {modifier} {type} = {initializer}.");
         }
 
         return Declaration.Replace(content, match =>
@@ -91,7 +92,7 @@ static class Patcher
     public static void RunSelfTest()
     {
         const string prefix = "using System;\n";
-        string unix = prefix + Target(Category, "nuint", "nuint.MaxValue", "#define B3_DEFAULT_CATEGORY_BITS UINT64_MAX") + Target(Mask, "nuint", "nuint.MaxValue", "B3_DEFAULT_MASK_BITS UINT64_MAX") + "public const nuint UNRELATED = nuint.MaxValue;\n";
+        string unix = prefix + Target(Category, "static readonly", "nuint", "unchecked(( nuint ) ( 18446744073709551615U ))", "#define B3_DEFAULT_CATEGORY_BITS UINT64_MAX") + Target(Mask, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "B3_DEFAULT_MASK_BITS UINT64_MAX") + "public const nuint UNRELATED = nuint.MaxValue;\n";
         string patched = Patch(unix);
         Assert(patched.Contains("public const ulong B3_DEFAULT_CATEGORY_BITS = 0xffffffffffffffffUL;"), "Unix category patch");
         Assert(patched.Contains("public const ulong B3_DEFAULT_MASK_BITS = 0xffffffffffffffffUL;"), "Unix mask patch");
@@ -105,24 +106,25 @@ static class Patcher
             "[NativeTypeName(\"#define B3_DEFAULT_CATEGORY_BITS UINT64_MAX\")]\r\npublic const ulong B3_DEFAULT_CATEGORY_BITS = 0xffffffffffffffffUL;\r\n" +
             "[NativeTypeName(\"#define B3_DEFAULT_MASK_BITS UINT64_MAX\")]\r\npublic const ulong B3_DEFAULT_MASK_BITS = 0xffffffffffffffffUL;\r\n";
         Assert(Patch(correctCrLf) == correctCrLf, "already-correct CRLF with BOM");
-        string badCrLf = "\uFEFFusing System;\r\n" + TargetCrLf(Category, "nuint", "nuint.MaxValue", "#define B3_DEFAULT_CATEGORY_BITS UINT64_MAX") + TargetCrLf(Mask, "nuint", "nuint.MaxValue", "B3_DEFAULT_MASK_BITS UINT64_MAX") + "public const nuint UNRELATED = nuint.MaxValue;\r\n";
+        string badCrLf = "\uFEFFusing System;\r\n" + TargetCrLf(Category, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "#define B3_DEFAULT_CATEGORY_BITS UINT64_MAX") + TargetCrLf(Mask, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "B3_DEFAULT_MASK_BITS UINT64_MAX") + "public const nuint UNRELATED = nuint.MaxValue;\r\n";
         string patchedCrLf = Patch(badCrLf);
         Assert(patchedCrLf[0] == '\uFEFF', "CRLF BOM preservation");
         Assert(patchedCrLf.Contains("public const ulong B3_DEFAULT_CATEGORY_BITS = 0xffffffffffffffffUL;\r\n"), "CRLF category patch");
         Assert(patchedCrLf.Contains("public const ulong B3_DEFAULT_MASK_BITS = 0xffffffffffffffffUL;\r\n"), "CRLF mask patch");
         Assert(patchedCrLf.Contains("public const nuint UNRELATED = nuint.MaxValue;\r\n"), "CRLF unrelated line preservation");
-        ExpectFailure(prefix + Target(Category, "nuint", "nuint.MaxValue", "variant"), "missing target");
-        ExpectFailure(prefix + Target(Category, "nuint", "nuint.MaxValue", "variant") + Target(Category, "ulong", "0xffffffffffffffffUL", "variant") + Target(Mask, "ulong", "0xffffffffffffffffUL", "variant"), "duplicate target");
-        ExpectFailure(Target(Category, "uint", "nuint.MaxValue", "variant") + Target(Mask, "nuint", "nuint.MaxValue", "variant"), "unexpected type");
-        ExpectFailure(Target(Category, "nuint", "UINT64_MAX", "variant") + Target(Mask, "nuint", "nuint.MaxValue", "variant"), "unexpected initializer");
-        ExpectFailure(Target(Category, "nuint", "0xffffffffffffffffUL", "variant") + Target(Mask, "ulong", "nuint.MaxValue", "variant"), "mismatched known pair");
+        ExpectFailure(prefix + Target(Category, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "variant"), "missing target");
+        ExpectFailure(prefix + Target(Category, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "variant") + Target(Category, "const", "ulong", "0xffffffffffffffffUL", "variant") + Target(Mask, "const", "ulong", "0xffffffffffffffffUL", "variant"), "duplicate target");
+        ExpectFailure(Target(Category, "const", "nuint", "unchecked((nuint)(18446744073709551615U))", "variant") + Target(Mask, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "variant"), "unexpected modifier");
+        ExpectFailure(Target(Category, "static readonly", "uint", "unchecked((nuint)(18446744073709551615U))", "variant") + Target(Mask, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "variant"), "unexpected type");
+        ExpectFailure(Target(Category, "static readonly", "nuint", "UINT64_MAX", "variant") + Target(Mask, "static readonly", "nuint", "unchecked((nuint)(18446744073709551615U))", "variant"), "unexpected initializer");
+        ExpectFailure(Target(Category, "static readonly", "nuint", "0xffffffffffffffffUL", "variant") + Target(Mask, "const", "ulong", "nuint.MaxValue", "variant"), "mismatched known pair");
     }
 
-    private static string Target(string name, string type, string value, string nativeTypeName) =>
-        $"[NativeTypeName(\"{nativeTypeName}\")]\npublic  const\t{type}   {name}\t= {value};\n";
+    private static string Target(string name, string modifier, string type, string value, string nativeTypeName) =>
+        $"[NativeTypeName(\"{nativeTypeName}\")]\npublic  {modifier}\t{type}   {name}\t= {value};\n";
 
-    private static string TargetCrLf(string name, string type, string value, string nativeTypeName) =>
-        $"[NativeTypeName(\"{nativeTypeName}\")]\r\npublic const {type} {name} = {value};\r\n";
+    private static string TargetCrLf(string name, string modifier, string type, string value, string nativeTypeName) =>
+        $"[NativeTypeName(\"{nativeTypeName}\")]\r\npublic {modifier} {type} {name} = {value};\r\n";
 
     private static void ExpectFailure(string input, string label)
     {
