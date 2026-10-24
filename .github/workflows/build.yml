@@ -6,7 +6,6 @@ env:
   UBUNTU_ARM_RUNNER: &ubuntu-latest-arm ubuntu-26.04-arm
   MACOS_FOR_DOTNET_IOS: &macos-latest-dotnet-ios macos-26
   BUILD_TYPE: Release
-  ANDROID_NDK_VER: 28.2.13676358
   ANDROID_PLATFORM_VER: 35
 
 permissions: # For GitHub OIDC
@@ -38,11 +37,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Android NDK
-        if: ${{ contains(matrix.platform.name, 'android') }}
-        shell: bash
-        run: |
-          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "ndk;${ANDROID_NDK_VER}" "platforms;android-${ANDROID_PLATFORM_VER}"
 
       - name: Build (Release)
         shell: bash
@@ -53,7 +47,6 @@ jobs:
           LARGE_WORLDS: ${{ matrix.large-worlds }}
           ANDROID_ABI: ${{ matrix.platform.abi }}
           BUILD_TYPE: Release
-          ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
           ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
         run: ./build-native.sh
 
@@ -68,7 +61,6 @@ jobs:
           BUILD_TYPE: Debug
           # Debug package assets are optimized checked binaries. build-native.sh
           # enables assertions and validation by default for this variant.
-          ANDROID_NDK_VER: ${{ env.ANDROID_NDK_VER }}
           ANDROID_PLATFORM_VER: ${{ env.ANDROID_PLATFORM_VER }}
         run: ./build-native.sh
 

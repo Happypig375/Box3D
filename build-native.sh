@@ -15,7 +15,7 @@
 #   BUILD_TYPE - package variant (Release or Debug; Debug produces an optimized checked binary)
 #   BOX3D_VALIDATE - ON to enable BOX3D_VALIDATE (defaults to ON for Debug)
 #   Android-only:
-#     ANDROID_ABI, ANDROID_NDK_VER, ANDROID_PLATFORM_VER
+#     ANDROID_ABI, ANDROID_PLATFORM_VER
 set -eu
 
 echo "--- Environment ---"
@@ -183,7 +183,9 @@ else
 
   if [[ "${NAME}" == android-* ]]; then
     # Android cross-compilation via NDK
-    TOOLCHAIN="${ANDROID_HOME}/ndk/${ANDROID_NDK_VER}/build/cmake/android.toolchain.cmake"
+    # Use the newest NDK preinstalled on the runner instead of a pinned version
+    NDK_ROOT="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}}"
+    TOOLCHAIN="${NDK_ROOT}/build/cmake/android.toolchain.cmake"
     CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN} -DANDROID_ABI=${ANDROID_ABI} -DANDROID_PLATFORM=android-${ANDROID_PLATFORM_VER} -DANDROID_STL=c++_static"
   fi
 
