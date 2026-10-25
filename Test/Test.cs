@@ -30,6 +30,10 @@ static class Program
 
 	public static unsafe int Main()
 	{
+#if IOS || TVOS || MACCATALYST
+		// Keep the Apple runtime assembly and UIKit linked into this console app.
+		GC.KeepAlive(typeof(UIKit.UIApplication));
+#endif
         Console.WriteLine("Starting test...");
 
 		// === Validate correct native binary is loaded ===
@@ -75,8 +79,9 @@ static class Program
 			// On Windows, "box3d" also matches the managed Box3D.dll because
 			// file-name matching is case-insensitive. Only a module exporting a
 			// Box3D native symbol proves that the opposite native binary is reachable.
+			bool isNativeBox3D = NativeLibrary.TryGetExport(handle, "b3SetAssertFcn", out _);
 			NativeLibrary.Free(handle);
-			if (NativeLibrary.TryGetExport(handle, "b3SetAssertFcn", out _))
+			if (isNativeBox3D)
 			{
 				Console.Error.WriteLine($"Box3D.targets failed to filter native binaries!");
 				return 3003;
