@@ -231,15 +231,13 @@ jobs:
             # Replace the rest of this if with this line once .NET 11 releases
             # dotnet run -p TargetFrameworks=${{ matrix.platform.tfm }} --device $UDID ${{ matrix.large-worlds && '-p:LargeWorlds=true' }}
 
-            # Boot simulator if not already booted
-            xcrun simctl boot "$UDID" 2>/dev/null || true
-            xcrun simctl bootstatus "$UDID"
             # Build the app (dotnet run --device requires mlaunch which is missing from .NET 11 preview workload packs)
             dotnet build -c ${{ matrix.config }} -p TargetFrameworks=${{ matrix.platform.tfm }} -r ${{ matrix.platform.name }} ${{ matrix.large-worlds && '-p:LargeWorlds=true' }} \
                 -p SupportedOSPlatformVersion=${{ contains(matrix.platform.name, 'ios') && '26.0' || '16.1' }} # work around https://github.com/dotnet/macios/pull/25975 until it's released
             APP_DIR="$PWD/bin/${{ matrix.config }}/${{ matrix.platform.tfm }}/${{ matrix.platform.name }}/Test.app"
             echo "APP_DIR=$APP_DIR"
             if [ -d "$APP_DIR" ]; then
+              xcrun simctl bootstatus "$UDID" -b
               xcrun simctl install "$UDID" "$APP_DIR"
               echo "=== Launching app on simulator (60s timeout) ==="
               SIM_LOG=$(mktemp)
