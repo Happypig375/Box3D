@@ -30,7 +30,17 @@ public class TestSceneDelegate : UIResponder, IUIWindowSceneDelegate
 
 		Window = new UIWindow(windowScene) { RootViewController = new UIViewController() };
 		Window.MakeKeyAndVisible();
-		DispatchQueue.MainQueue.DispatchAsync(() => Environment.Exit(Program.RunValidation()));
+		DispatchQueue.MainQueue.DispatchAsync(() =>
+		{
+			int exitCode = Program.RunValidation();
+#if IOS
+			// The simulator's console attachment can lose the last lines as the app exits.
+			string result = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "box3d-validation-result");
+			System.IO.File.WriteAllText(result + ".tmp", exitCode.ToString(System.Globalization.CultureInfo.InvariantCulture));
+			System.IO.File.Move(result + ".tmp", result, overwrite: true);
+#endif
+			Environment.Exit(exitCode);
+		});
 	}
 }
 #endif

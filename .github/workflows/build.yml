@@ -241,19 +241,32 @@ jobs:
               xcrun simctl install "$UDID" "$APP_DIR"
               LAUNCH_ATTEMPTS=1
               LAUNCH_TIMEOUT=60
+              SIM_RESULT=
               if [[ "$SIM_OS" == iOS ]]; then
                 # A cold iOS simulator can take nearly a minute to start the app.
                 LAUNCH_ATTEMPTS=2
                 LAUNCH_TIMEOUT=120
+                SIM_DATA_DIR=$(xcrun simctl get_app_container "$UDID" com.github.Happypig375.Box3D data)
+                SIM_RESULT="${SIM_DATA_DIR:?}/tmp/box3d-validation-result"
               fi
               SIM_LOG=$(mktemp)
               TEST_PASSED=false
               for attempt in $(seq 1 "$LAUNCH_ATTEMPTS"); do
+                if [[ -n "$SIM_RESULT" ]]; then
+                  rm -f -- "$SIM_RESULT"
+                fi
                 echo "=== Launching app on simulator (attempt $attempt, ${LAUNCH_TIMEOUT}s timeout) ==="
                 xcrun simctl launch --console "$UDID" com.github.Happypig375.Box3D --connection-mode=none > "$SIM_LOG" 2>&1 &
                 SIM_PID=$!
                 for ((elapsed = 0; elapsed < LAUNCH_TIMEOUT; elapsed++)); do
-                  if grep -qF "Test succeeded." "$SIM_LOG" || ! kill -0 "$SIM_PID" 2>/dev/null; then
+                  if [[ -n "$SIM_RESULT" ]]; then
+                    if [[ -f "$SIM_RESULT" ]]; then
+                      break
+                    fi
+                  elif grep -qF "Test succeeded." "$SIM_LOG"; then
+                    break
+                  fi
+                  if ! kill -0 "$SIM_PID" 2>/dev/null; then
                     break
                   fi
                   sleep 1
@@ -269,7 +282,15 @@ jobs:
                   echo "=== Detected failure in simulator output ===" >&2
                   break
                 fi
-                if grep -qF "Test succeeded." "$SIM_LOG"; then
+                if [[ -n "$SIM_RESULT" && -f "$SIM_RESULT" ]]; then
+                  TEST_EXIT_CODE=$(cat "$SIM_RESULT")
+                  echo "iOS validation exit code: $TEST_EXIT_CODE"
+                  if [[ "$TEST_EXIT_CODE" == 0 ]]; then
+                    TEST_PASSED=true
+                  fi
+                  break
+                fi
+                if [[ -z "$SIM_RESULT" ]] && grep -qF "Test succeeded." "$SIM_LOG"; then
                   TEST_PASSED=true
                   break
                 fi
