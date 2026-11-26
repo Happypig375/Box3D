@@ -10,6 +10,10 @@
     <DefineConstants Condition="'$(LargeWorlds)' == 'true'">$(DefineConstants);LARGE_WORLDS</DefineConstants>
   </PropertyGroup>
 
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <PartialAppManifest Include="IOSScene.plist" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Box3D" Version="*" Condition="'$(LargeWorlds)' != 'true'" />
     <PackageReference Include="Box3D.LargeWorlds" Version="*" Condition="'$(LargeWorlds)' == 'true'" />
