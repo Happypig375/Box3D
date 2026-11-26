@@ -1,10 +1,10 @@
-#if IOS
+#if IOS || MACCATALYST
 using System;
 using CoreFoundation;
 using Foundation;
 using UIKit;
 
-static class IOSApp
+static class AppleApp
 {
 	public static void Main(string[] args) => UIApplication.Main(args, null, typeof(TestAppDelegate));
 }

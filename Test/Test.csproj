@@ -10,8 +10,8 @@
     <DefineConstants Condition="'$(LargeWorlds)' == 'true'">$(DefineConstants);LARGE_WORLDS</DefineConstants>
   </PropertyGroup>
 
-  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
-    <PartialAppManifest Include="IOSScene.plist" />
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios' Or $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+    <PartialAppManifest Include="AppleScene.plist" />
   </ItemGroup>
 
   <ItemGroup>

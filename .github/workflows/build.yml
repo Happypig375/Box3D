@@ -239,37 +239,47 @@ jobs:
             if [ -d "$APP_DIR" ]; then
               xcrun simctl bootstatus "$UDID" -b
               xcrun simctl install "$UDID" "$APP_DIR"
-              echo "=== Launching app on simulator (60s timeout) ==="
+              LAUNCH_ATTEMPTS=1
+              LAUNCH_TIMEOUT=60
+              if [[ "$SIM_OS" == iOS ]]; then
+                # A cold iOS simulator can take nearly a minute to start the app.
+                LAUNCH_ATTEMPTS=2
+                LAUNCH_TIMEOUT=120
+              fi
               SIM_LOG=$(mktemp)
-              xcrun simctl launch --console "$UDID" com.github.Happypig375.Box3D --connection-mode=none > "$SIM_LOG" 2>&1 &
-              SIM_PID=$!
               TEST_PASSED=false
-              for i in $(seq 1 60); do
-                if grep -q "Test succeeded." "$SIM_LOG" 2>/dev/null; then
-                  echo "=== Test succeeded marker found ==="
+              for attempt in $(seq 1 "$LAUNCH_ATTEMPTS"); do
+                echo "=== Launching app on simulator (attempt $attempt, ${LAUNCH_TIMEOUT}s timeout) ==="
+                xcrun simctl launch --console "$UDID" com.github.Happypig375.Box3D --connection-mode=none > "$SIM_LOG" 2>&1 &
+                SIM_PID=$!
+                for ((elapsed = 0; elapsed < LAUNCH_TIMEOUT; elapsed++)); do
+                  if grep -qF "Test succeeded." "$SIM_LOG" || ! kill -0 "$SIM_PID" 2>/dev/null; then
+                    break
+                  fi
+                  sleep 1
+                done
+
+                # Release simctl's console attachment before checking the complete output.
+                xcrun simctl terminate "$UDID" com.github.Happypig375.Box3D 2>/dev/null || true
+                kill "$SIM_PID" 2>/dev/null || true
+                wait "$SIM_PID" 2>/dev/null || true
+                cat "$SIM_LOG"
+
+                if grep -qE "Unhandled exception|DllNotFoundException|Box3D.targets failed" "$SIM_LOG"; then
+                  echo "=== Detected failure in simulator output ===" >&2
+                  break
+                fi
+                if grep -qF "Test succeeded." "$SIM_LOG"; then
                   TEST_PASSED=true
                   break
                 fi
-                if ! kill -0 "$SIM_PID" 2>/dev/null; then
-                  echo "=== Simulator console process exited before success ==="
+                if grep -qF "Starting test..." "$SIM_LOG"; then
                   break
                 fi
-                sleep 1
+                if [[ "$attempt" -lt "$LAUNCH_ATTEMPTS" ]]; then
+                  echo "Simulator app exited or timed out before validation started. Retrying launch." >&2
+                fi
               done
-
-              # Release simctl's console attachment after either success or timeout.
-              xcrun simctl terminate "$UDID" com.github.Happypig375.Box3D 2>/dev/null || true
-              kill "$SIM_PID" 2>/dev/null || true
-              wait "$SIM_PID" 2>/dev/null || true
-              cat "$SIM_LOG"
-
-              if grep -q "Test succeeded." "$SIM_LOG" 2>/dev/null; then
-                TEST_PASSED=true
-              fi
-              if grep -qE "Unhandled exception|DllNotFoundException|Box3D.targets failed" "$SIM_LOG" 2>/dev/null; then
-                echo "=== Detected failure in simulator output ===" >&2
-                TEST_PASSED=false
-              fi
               rm -f "$SIM_LOG"
               if [ "$TEST_PASSED" != true ]; then
                 echo "Simulator validation did not observe a successful test completion" >&2

@@ -28,13 +28,13 @@ static class Program
 		return 0; // prevent native __debugbreak()/__builtin_trap()
 	}
 
-#if !IOS
+#if !(IOS || MACCATALYST)
 	public static int Main() => RunValidation();
 #endif
 
 	internal static unsafe int RunValidation()
 	{
-#if TVOS || MACCATALYST
+#if TVOS
 		// Keep the Apple runtime assembly and UIKit linked into this console app.
 		GC.KeepAlive(typeof(UIKit.UIApplication));
 #endif
